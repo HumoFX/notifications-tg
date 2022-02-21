@@ -1,8 +1,8 @@
 import os
 from typing import Any, Dict, Optional
-
-from fastapi.requests import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, ujson
+import asyncio
+import aiohttp
 from pydantic import BaseSettings, EmailStr, SecretStr, validator
 
 
@@ -28,14 +28,14 @@ class Settings(BaseSettings):
             db=values.get("POSTGRES_DB"),
         )
 
-    FIRST_USER_EMAIL: EmailStr
-    FIRST_USER_PASSWORD: SecretStr
+    # FIRST_USER_EMAIL: EmailStr
+    # FIRST_USER_PASSWORD: SecretStr
 
-    SECRET_KEY: SecretStr
-    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    # SECRET_KEY: SecretStr
+    # ACCESS_TOKEN_EXPIRE_MINUTES: int
 
-    REDIS_HOST: str
-    REDIS_PORT: int
+    # REDIS_HOST: str
+    # REDIS_PORT: int
 
     BOT_TOKEN: str
 
@@ -46,21 +46,37 @@ class Settings(BaseSettings):
     def get_telegram_url(self):
         return "https://api.telegram.org/bot{}/".format(self.BOT_TOKEN)
 
+    class Config:
+        case_sensitive = True
+        env_file = ".env"
+
 
 settings = Settings()
 
 # create dataclass for telegram bot with token , url and sendMessage method
 
 
+async def post(url, headers, **kwargs):
+    async with aiohttp.ClientSession(json_serialize=ujson.dumps) as session:
+        try:
+            async with session.post(url, headers=headers, json=kwargs) as response:
+                status = response.status
+                # print(await response.json())
+                if status == 200:
+                    data = await response.json()
+                    return data
+        except Exception as err:
+            pass
+            # logger.exception(f"Error in post {err}")
+
+
 class TelegramBot:
-    def __init__(self, token: str):
-        self.token = token
+    def __init__(self):
+        self.token = settings.get_bot_token()
         self.url = "https://api.telegram.org/bot{}/".format(self.token)
 
     def sendMessage(self, chat_id: int, text: str):
         url = self.url + "sendMessage"
         params = {"chat_id": chat_id, "text": text}
-        response = requests.Request(receive=params)
-        response.post(url)
-
-        return response.json()
+        response = post(url, {"Content-Type": "application/json"}, **params)
+        return response

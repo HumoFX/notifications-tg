@@ -4,8 +4,8 @@ from pydantic import BaseModel
 
 class Notification(BaseModel):
     body: str
-    payload: dict
-    newsModel: Optional[dict]
+    payload: Optional[dict] = None
+    newsModel: Optional[dict] = None
     fcmToken: Optional[str]
     applicationId: Optional[str]
     id: Optional[int]
