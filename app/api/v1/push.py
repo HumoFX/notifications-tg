@@ -1,27 +1,24 @@
 from fastapi import APIRouter
 
-from app.core import redis
-from app.core.models import User
+from app.models.users import User, UserCustomer
 from app.schemas.notification import Notification
 from app.schemas.reponse import ResponseBody
 from app.core.config import TelegramBot, settings
 
 router = APIRouter(prefix="/notification", tags=["notification"])
+telegram_bot = TelegramBot()
 
 
 @router.post("/", response_model=ResponseBody, status_code=201)
 async def create_task(notification: Notification):
-    # filter user from User model by notification.customerId in data field
-    user = await User.get(notification.customerId).first()
-
-    telegram_bot = TelegramBot()
-    print(settings.POSTGRES_URI)
-    print(notification)
-    response = ResponseBody(status=0, data={"message": "success"})
-    return response
-
-
-# @router.get("/{task_id}/")
-# async def get_task(task_id: str):
-#     job = ArqJob(task_id, redis.pool)
-#     return await job.info()
+    customer = await UserCustomer.get(notification.customerId)
+    if customer:
+        message = await telegram_bot.send_message(customer.user_id, notification.body)
+        if message.get("ok"):
+            return ResponseBody(status=0, data={"message": "success"})
+        elif message.get("error_code") == 404:
+            return ResponseBody(status=1000, errorMessage="User not found")
+        else:
+            return ResponseBody(status=1001, errorMessage="Failed to send message")
+    else:
+        return ResponseBody(status=2000, errorMessage="Customer not found")

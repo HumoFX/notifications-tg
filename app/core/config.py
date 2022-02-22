@@ -57,11 +57,10 @@ settings = Settings()
 
 
 async def post(url, headers, **kwargs):
-    async with aiohttp.ClientSession(json_serialize=ujson.dumps) as session:
+    async with aiohttp.ClientSession() as session:
         try:
             async with session.post(url, headers=headers, json=kwargs) as response:
                 status = response.status
-                # print(await response.json())
                 if status == 200:
                     data = await response.json()
                     return data
@@ -72,11 +71,10 @@ async def post(url, headers, **kwargs):
 
 class TelegramBot:
     def __init__(self):
-        self.token = settings.get_bot_token()
+        self.token = settings.BOT_TOKEN
         self.url = "https://api.telegram.org/bot{}/".format(self.token)
 
-    def sendMessage(self, chat_id: int, text: str):
-        url = self.url + "sendMessage"
-        params = {"chat_id": chat_id, "text": text}
-        response = post(url, {"Content-Type": "application/json"}, **params)
+    def send_message(self, chat_id: int, text: str):
+        url = self.url + "sendMessage?chat_id={}&text={}".format(chat_id, text)
+        response = post(url, {"Content-Type": "application/json"})
         return response
