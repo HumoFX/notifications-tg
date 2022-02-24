@@ -14,6 +14,8 @@ async def create_task(notification: Notification):
     customer = await UserCustomer.get(notification.customerId)
     if customer:
         message = await telegram_bot.send_message(customer.user_id, notification.body)
+        print(telegram_bot.token)
+        print(message)
         if message.get("ok"):
             return ResponseBody(status=0, data={"message": "success"})
         elif message.get("error_code") == 404:
