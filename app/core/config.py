@@ -65,6 +65,7 @@ async def post(url, headers, **kwargs):
                     data = await response.json()
                     return data
         except Exception as err:
+            print(err)
             pass
             # logger.exception(f"Error in post {err}")
 
