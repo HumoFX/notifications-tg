@@ -69,7 +69,7 @@ async def post(url, headers, **kwargs):
             # logger.exception(f"Error in post {err}")
 
 
-class TelegramBot:
+class BotNotify:
     def __init__(self):
         self.token = settings.BOT_TOKEN
         self.url = "https://api.telegram.org/bot{}/".format(self.token)

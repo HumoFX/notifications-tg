@@ -3,18 +3,18 @@ from fastapi import APIRouter
 from app.models.users import User, UserCustomer
 from app.schemas.notification import Notification
 from app.schemas.reponse import ResponseBody
-from app.core.config import TelegramBot, settings
+from app.core.config import BotNotify, settings
 
 router = APIRouter(prefix="/notification", tags=["notification"])
-telegram_bot = TelegramBot()
+bot = BotNotify()
 
 
 @router.post("/", response_model=ResponseBody, status_code=201)
 async def create_task(notification: Notification):
     customer = await UserCustomer.get(notification.customerId)
     if customer:
-        message = await telegram_bot.send_message(customer.user_id, notification.body)
-        print(telegram_bot.token)
+        message = await bot.send_message(customer.user_id, notification.body)
+        print(bot.token)
         print(message)
         if message.get("ok"):
             return ResponseBody(status=0, data={"message": "success"})
