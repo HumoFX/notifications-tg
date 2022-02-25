@@ -1,4 +1,5 @@
 import os
+import requests
 from typing import Any, Dict, Optional
 from fastapi.responses import JSONResponse, ujson
 import asyncio
@@ -80,4 +81,9 @@ class BotNotify:
         print(url)
         response = post(url, {"Content-Type": "application/json"})
         print(response)
+        return response
+
+    def sendMessage(self, chat_id: int, text: str):
+        url = self.url + "sendMessage?chat_id={}&text={}".format(chat_id, text)
+        response = requests.post(url, headers={"Content-Type": "application/json"})
         return response
