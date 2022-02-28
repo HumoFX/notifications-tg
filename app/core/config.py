@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     # REDIS_PORT: int
 
     BOT_TOKEN: str
+    proxy = {"http": "http://192.168.156.200:8080"}
 
     def get_bot_token(self):
         self.BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -85,6 +86,6 @@ class BotNotify:
 
     def sendMessage(self, chat_id: int, text: str):
         url = self.url + "sendMessage?chat_id={}&text={}".format(chat_id, text)
-        response = requests.post(url, headers={"Content-Type": "application/json"})
+        response = requests.post(url, headers={"Content-Type": "application/json"}, proxies=settings.proxy)
         return response.json()
 
