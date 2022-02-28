@@ -87,5 +87,8 @@ class BotNotify:
     def sendMessage(self, chat_id: int, text: str):
         url = self.url + "sendMessage?chat_id={}&text={}".format(chat_id, text)
         response = requests.post(url, headers={"Content-Type": "application/json"})
+        print(response.headers)
+        print(response.json())
+        print(response.content)
         return response.json()
 
