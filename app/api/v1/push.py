@@ -1,3 +1,4 @@
+import requests
 from fastapi import APIRouter
 
 from app.models.users import User, UserCustomer
@@ -24,3 +25,13 @@ async def create_task(notification: Notification):
             return ResponseBody(status=1001, errorMessage="Failed to send message")
     else:
         return ResponseBody(status=2000, errorMessage="Customer not found")
+
+
+@router.post("/test")
+async def test_notification(token: str, chat_id: int, text: str):
+    # send request to api telegram org bot
+    # https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat_id>&text=<text>
+    api_url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}"
+    response = requests.post(api_url, headers={"Content-Type": "application/json"})
+    return response
+
