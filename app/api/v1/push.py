@@ -33,5 +33,5 @@ async def test_notification(token: str, chat_id: int, text: str):
     # https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat_id>&text=<text>
     api_url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}"
     response = requests.post(api_url, headers={"Content-Type": "application/json"})
-    return response
+    return response.json()
 
