@@ -1,3 +1,4 @@
+import json
 import os
 import requests
 from typing import Any, Dict, Optional
@@ -39,7 +40,7 @@ class Settings(BaseSettings):
     # REDIS_PORT: int
 
     BOT_TOKEN: str
-    proxy = {"http": "http://192.168.152.200:8080"}
+    proxy = {"http": "http://192.168.152.200:8080", "https": "http://192.168.152.200:8080"}
 
     def get_bot_token(self):
         self.BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -84,9 +85,29 @@ class BotNotify:
         print(response)
         return response
 
-    def sendMessage(self, chat_id: int, text: str):
-        url = self.url + "sendMessage?chat_id={}&text={}&parse_mode=Markdown".format(chat_id, text)
-        response = requests.post(url, headers={"Content-Type": "application/json"})
+    def sendMessage(self, chat_id: int, text: str, customer_id: int):
+        markup = {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "Мои заявки",
+                        "callback_data": "my_app: {customer_id}".format(customer_id=customer_id),
+                    },
+                ]
+            ]
+        }
+        # markup = json.dumps(markup)
+        data = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "Markdown",
+            "reply_markup": markup,
+        }
+        url = self.url + "sendMessage"
+        # response = requests.post(url=url, data=data)
+
+        # url = self.url + "sendMessage?chat_id={}&text={}&parse_mode=Markdown".format(chat_id, text)
+        response = requests.post(url, headers={"Content-Type": "application/json"}, json=data, proxies=settings.proxy)
         print(response.headers)
         print(response.json())
         print(response.content)

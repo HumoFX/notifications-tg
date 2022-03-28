@@ -16,7 +16,7 @@ async def create_task(notification: Notification):
     if customer:
         # message = await bot.send_message(customer.user_id, notification.body)
         text = f"*{notification.title}*\n{notification.body}"
-        message = bot.sendMessage(customer.user_id, text)
+        message = bot.sendMessage(customer.user_id, text, customer_id=customer.customer_id)
         if message.get("ok"):
             return ResponseBody(status=0, data={"message": "success"})
         elif message.get("error_code") == 404:
