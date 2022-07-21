@@ -1,7 +1,11 @@
+import os
+import textwrap
+
 import requests
 from fastapi import APIRouter
 
 from app.models.users import User, UserCustomer
+from app.schemas.error import AlertMessage
 from app.schemas.notification import Notification
 from app.schemas.reponse import ResponseBody
 from app.core.config import BotNotify, settings
@@ -35,3 +39,16 @@ async def test_notification(token: str, chat_id: str, text: str):
     response = requests.post(api_url, headers={"Content-Type": "application/json"})
     return response.json()
 
+
+@router.post('/errors', response_model=ResponseBody, status_code=200)
+async def error_handler(error: AlertMessage):
+    message = await bot.send_alert_message(error)
+    if message:
+        if message.get('ok'):
+            return ResponseBody(status=0, data={"message": "success"})
+        elif message.get("error_code") == 404:
+            return ResponseBody(status=1000, errorMessage="User not found")
+        else:
+            return ResponseBody(status=1001, errorMessage="Failed to send message")
+    else:
+        return ResponseBody(status=1002, errorMessage="Failed to send message")

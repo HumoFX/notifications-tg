@@ -1,11 +1,15 @@
 import json
 import os
+import textwrap
+
 import requests
 from typing import Any, Dict, Optional
 from fastapi.responses import JSONResponse, ujson
 import asyncio
 import aiohttp
 from pydantic import BaseSettings, EmailStr, SecretStr, validator
+
+from app.schemas.error import AlertMessage
 
 
 class Settings(BaseSettings):
@@ -40,14 +44,27 @@ class Settings(BaseSettings):
     # REDIS_PORT: int
 
     BOT_TOKEN: str
+    ALERT_BOT_TOKEN: str
+    ALERT_CHANNEL_ID: str
     proxy = {"http": "http://192.168.152.200:8080", "https": "http://192.168.152.200:8080"}
 
     def get_bot_token(self):
         self.BOT_TOKEN = os.environ.get("BOT_TOKEN")
         return self.BOT_TOKEN
 
+    def get_alert_bot_token(self):
+        self.BOT_TOKEN = os.environ.get("ALERT_BOT_TOKEN")
+        return self.BOT_TOKEN
+
+    def get_alert_channel_id(self):
+        self.ALERT_CHANNEL_ID = os.environ.get("ALERT_CHANNEL_ID")
+        return self.ALERT_CHANNEL_ID
+
     def get_telegram_url(self):
         return "https://api.telegram.org/bot{}/".format(self.BOT_TOKEN)
+
+    def get_alert_url(self):
+        return "https://api.telegram.org/bot{}/".format(self.ALERT_BOT_TOKEN)
 
     class Config:
         case_sensitive = True
@@ -56,13 +73,14 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+
 # create dataclass for telegram bot with token , url and sendMessage method
 
 
-async def post(url, headers, **kwargs):
+async def post(url, headers, proxy, **kwargs):
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.post(url, headers=headers, json=kwargs) as response:
+            async with session.post(url, headers=headers, json=kwargs, proxy=proxy.get('http')) as response:
                 status = response.status
                 if status == 200:
                     data = await response.json()
@@ -77,12 +95,32 @@ class BotNotify:
     def __init__(self):
         self.token = settings.BOT_TOKEN
         self.url = "https://api.telegram.org/bot{}/".format(self.token)
+        self.alert_url = "https://api.telegram.org/bot{}/".format(settings.ALERT_BOT_TOKEN)
+        self.alert_channel = settings.ALERT_CHANNEL_ID
 
-    def send_message(self, chat_id: int, text: str):
+    async def send_message(self, chat_id: str, text: str):
         url = self.url + "sendMessage?chat_id={}&text={}".format(chat_id, text)
-        print(url)
-        response = post(url, {"Content-Type": "application/json"})
-        print(response)
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy)
+        return response
+
+    async def send_alert_message(self, error: AlertMessage):
+        text = f"<i>🚨 {error.criticalityLevel}</i>\n"
+        text += f"<b>{error.errorName}</b>\n"
+        text += f"<pre>Код ошибки: {error.errorCode}</pre>\n"
+        text += f"<pre>Раздел: {error.section}</pre>\n"
+        text += f"<pre>Операции: {error.operation}</pre>\n"
+        text += f"<pre>Статус операции: {error.operationStatus}</pre>\n"
+        text += f"<pre>Код операции IFB: {error.operationCodeIFB}</pre>\n"
+        text += f"<pre>Код операции АБС: {error.operationCodeABS}</pre>\n"
+
+        text = textwrap.dedent(text)
+        data = {
+            "chat_id": self.alert_channel,
+            "text": text,
+            "parse_mode": "HTML",
+        }
+        url = self.alert_url + "sendMessage"
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
         return response
 
     def sendMessage(self, chat_id: int, text: str, customer_id: int):
@@ -108,8 +146,4 @@ class BotNotify:
 
         # url = self.url + "sendMessage?chat_id={}&text={}&parse_mode=Markdown".format(chat_id, text)
         response = requests.post(url, headers={"Content-Type": "application/json"}, json=data, proxies=settings.proxy)
-        print(response.headers)
-        print(response.json())
-        print(response.content)
         return response.json()
-
