@@ -3,11 +3,11 @@ from pydantic import BaseModel
 
 
 class AlertMessage(BaseModel):
-    criticalityLevel: str
-    section: str
-    operation: str
-    errorCode: int
-    errorName: str
-    operationStatus: str
-    operationCodeIFB: str
-    operationCodeABS: str
+    criticalityLevel:  Optional[str]
+    section:  Optional[str]
+    operation:  Optional[str]
+    errorCode:  Optional[int]
+    errorName:  Optional[str]
+    operationStatus:  Optional[str]
+    operationCodeIFB:  Optional[str]
+    operationCodeABS:  Optional[str]
