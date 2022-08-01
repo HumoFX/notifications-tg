@@ -107,11 +107,16 @@ class BotNotify:
         text = f"<i>🚨 {error.criticalityLevel}</i>\n"
         text += f"<b>{error.errorName}</b>\n"
         text += f"<pre>Код ошибки: {error.errorCode}</pre>\n"
-        text += f"<pre>Раздел: {error.section}</pre>\n"
-        text += f"<pre>Операции: {error.operation}</pre>\n"
-        text += f"<pre>Статус операции: {error.operationStatus}</pre>\n"
-        text += f"<pre>Код операции IFB: {error.operationCodeIFB}</pre>\n"
-        text += f"<pre>Код операции АБС: {error.operationCodeABS}</pre>\n"
+        if error.section:
+            text += f"<pre>Раздел: {error.section}</pre>\n"
+        if error.operation:
+            text += f"<pre>Операции: {error.operation}</pre>\n"
+        if error.operationStatus:
+            text += f"<pre>Статус операции: {error.operationStatus}</pre>\n"
+        if error.operationCodeIFB:
+            text += f"<pre>Код операции IFB: {error.operationCodeIFB}</pre>\n"
+        if error.operationCodeABS:
+            text += f"<pre>Код операции АБС: {error.operationCodeABS}</pre>\n"
 
         text = textwrap.dedent(text)
         data = {
