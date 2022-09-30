@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 
 class AlertMessage(BaseModel):
+    tag: Optional[str]
     criticalityLevel:  Optional[str]
     section:  Optional[str]
     operation:  Optional[str]

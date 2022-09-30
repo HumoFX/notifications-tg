@@ -117,6 +117,8 @@ class BotNotify:
             text += f"<pre>Код операции IFB: {error.operationCodeIFB}</pre>\n"
         if error.operationCodeABS:
             text += f"<pre>Код операции АБС: {error.operationCodeABS}</pre>\n"
+        if error.tag:
+            text += f"#{error.tag}\n"
 
         text = textwrap.dedent(text)
         data = {
