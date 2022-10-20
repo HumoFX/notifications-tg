@@ -96,8 +96,8 @@ class BotNotify:
         self.alert_url = "https://api.telegram.org/bot{}/".format(settings.ALERT_BOT_TOKEN)
         self.alert_channel = settings.ALERT_CHANNEL_ID
 
-    async def send_message(self, chat_id: str, text: str):
-        url = self.url + "sendMessage?chat_id={}&text={}".format(chat_id, text)
+    async def send_message(self, chat_id: str, text: str, parse_mode: str = 'HTML'):
+        url = self.url + "sendMessage?chat_id={}&text={}&parse_mode={}".format(chat_id, text, parse_mode)
         response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy)
         return response
 
