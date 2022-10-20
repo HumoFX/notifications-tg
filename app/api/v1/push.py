@@ -24,7 +24,7 @@ async def create_task(notification: Notification):
         if message.get("ok"):
             return ResponseBody(status=0, data={"message": "success"})
         elif message.get("error_code") == 404:
-            return ResponseBody(status=1000, errorMessage="User not found")
+            return ResponseBody(status=1001, errorMessage="User not found")
         else:
             return ResponseBody(status=1001, errorMessage="Failed to send message")
     else:

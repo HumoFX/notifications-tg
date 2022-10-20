@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import textwrap
 
 import requests
@@ -81,12 +82,9 @@ async def post(url, headers, proxy, **kwargs):
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(url, headers=headers, json=kwargs, proxy=proxy.get('http')) as response:
-                status = response.status
-                if status == 200:
-                    data = await response.json()
-                    return data
+                data = await response.json()
+                return data
         except Exception as err:
-            print(err)
             pass
             # logger.exception(f"Error in post {err}")
 
@@ -154,3 +152,17 @@ class BotNotify:
         # url = self.url + "sendMessage?chat_id={}&text={}&parse_mode=Markdown".format(chat_id, text)
         response = requests.post(url, headers={"Content-Type": "application/json"}, json=data, proxies=settings.proxy)
         return response.json()
+
+    async def send_sms_info(self, chat_id, text):
+        codes = re.findall(r"\b\d+\b", text)
+        if len(codes) == 1:
+            text = text.replace(codes[0], f"<pre>{codes[0]}</pre>")
+        message = f"💬 {text}"
+        return await self.send_message(chat_id, message)
+
+
+
+
+
+
+
