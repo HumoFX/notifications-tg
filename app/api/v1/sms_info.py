@@ -10,7 +10,7 @@ router = APIRouter(prefix="/sms_info", tags=["sms"])
 bot = BotNotify()
 
 
-@router.post("/check", response_model=ResponseBody, status_code=200)
+@router.get("/check/{customerId}", response_model=ResponseBody, status_code=200)
 async def check_auth(customerId: str):
     """
     Check if the user is authenticated in telegram bot
