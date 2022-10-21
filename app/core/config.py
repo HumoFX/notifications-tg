@@ -144,7 +144,7 @@ class BotNotify:
             "chat_id": chat_id,
             "text": text,
             "parse_mode": "Markdown",
-            "reply_markup": markup,
+            # "reply_markup": markup,
         }
         url = self.url + "sendMessage"
         # response = requests.post(url=url, data=data)

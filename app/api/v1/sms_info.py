@@ -31,7 +31,7 @@ async def send(sms: SMS):
     :param sms:
     :return:
     """
-    customer: UserCustomer = await UserCustomer.get(sms.customer_id)
+    customer: UserCustomer = await UserCustomer.get(sms.customerId)
     message = await bot.send_sms_info(text=sms.message, chat_id=customer.user_id)
     if not customer:
         return ResponseBody(status=2000, errorMessage="Customer not found")

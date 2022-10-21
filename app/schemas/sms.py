@@ -3,8 +3,5 @@ from pydantic import BaseModel
 
 
 class SMS(BaseModel):
-    customer_id: int
+    customerId: int
     message: str
-
-    class Config:
-        camel
