@@ -10,3 +10,4 @@ class Notification(BaseModel):
     actionType: Optional[str]
     customerId: Optional[int]
     uuid: Optional[str]
+    topicName: Optional[str]
