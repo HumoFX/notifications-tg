@@ -9,6 +9,7 @@ from app.schemas.error import AlertMessage
 from app.schemas.notification import Notification
 from app.schemas.reponse import ResponseBody
 from app.core.config import BotNotify, settings
+from app.utils.notification_service import get_all_subscribers, send_notification_to_topic, get_status
 
 router = APIRouter(prefix="/notification", tags=["notification"])
 bot = BotNotify()
@@ -16,6 +17,15 @@ bot = BotNotify()
 
 @router.post("/", response_model=ResponseBody, status_code=201)
 async def create_task(notification: Notification):
+    if notification.topicName:
+        # get all subscribers of topic
+        subscribers = await get_all_subscribers(notification.topicName)
+        if subscribers:
+            # send notification to all subscribers
+            task_uuid = await send_notification_to_topic(subscribers, notification.body)
+            return ResponseBody(status=0, data={"message": "success", "task_uuid": task_uuid})
+        else:
+            return ResponseBody(status=1001, errorMessage="No subscribers found")
     customer = await UserCustomer.get(notification.customerId)
     if customer:
         # message = await bot.send_message(customer.user_id, notification.body)
@@ -52,3 +62,9 @@ async def error_handler(error: AlertMessage):
             return ResponseBody(status=1001, errorMessage="Failed to send message")
     else:
         return ResponseBody(status=1002, errorMessage="Failed to send message")
+
+@router.get("/{task_uuid}", response_model=ResponseBody, status_code=200)
+async def get_task_status(task_uuid: str):
+    return ResponseBody(status=0, data=await get_status(task_uuid))
+
+
