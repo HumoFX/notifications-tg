@@ -1,5 +1,10 @@
 import aiohttp
-from app.core.config import settings
+import asyncio
+import uuid
+from app.core.config import settings, BotNotify
+from app.models.users import UserCustomer
+
+tasks = {}
 
 
 async def get_topic_subscribers(topic: str, page: int = 1):
@@ -29,18 +34,28 @@ async def get_all_subscribers(topic: str):
     subscribers = []
     while True:
         response = await get_topic_subscribers(topic, page)
-        if response:
-            subscribers.extend(response)
+        if response and response.get("data"):
+            subscribers.extend(response.get("data"))
             page += 1
         else:
             break
 
-async def send_batch_notification_to_topic(subscribers: list, message: str, bot: BotNotify):
+async def customer_find_from_subscribers(subscribers: list):
+    # find customer from subscribers
+    customers = []
+    for subscriber in subscribers:
+        customer = await UserCustomer.get(subscriber.get("customerId"))
+        if customer:
+            customers.append(customer.user_id)
+    return customers
+
+async def send_batch_notification_to_topic_task(subscribers: list, message: str, bot: BotNotify):
     success = 0
     failed = 0
+    subscribers = await customer_find_from_subscribers(subscribers)
     for subscriber in subscribers:
         # send notification to subscriber
-        message = await bot.send_message(subscriber, message)
+        message = await bot.send_message(subscriber.user_id, message)
         if message.get("ok"):
             success += 1
         else:
@@ -48,7 +63,7 @@ async def send_batch_notification_to_topic(subscribers: list, message: str, bot:
         # sleep for 0.5 seconds
         await asyncio.sleep(0.05)
         # save to task result
-        tasks[task_uuid].result = {"success": success, "failed": failed, "total": len(subscribers)}
+        yield {"success": success, "failed": failed, "total": len(subscribers)}
 
 
 async def get_status(task_uuid: str):
@@ -60,6 +75,7 @@ async def get_status(task_uuid: str):
             result["status"] = "done"
         else:
             result["status"] = "pending"
+        print(result)
         return result
     else:
         return {"status": "not found"}
