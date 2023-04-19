@@ -92,14 +92,21 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     subscribers = []
     self.update_state(state="PROGRESS", meta={"progress": "get subscribers", "page": page, "total": 0})
     while True:
-        response = loop.run_until_complete(get_topic_subscribers(topic, page))
-        if response and response.get("data"):
-            subscribers.extend(response.get("data"))
-            page += 1
-            self.update_state(state="PROGRESS",
-                              meta={"progress": "get subscribers", "page": page, "total": len(subscribers)})
-        else:
-            break
+        print("get subscribers")
+        try:
+            response = loop.run_until_complete(get_topic_subscribers(topic, page))
+            if response and response.get("data"):
+                subscribers.extend(response.get("data"))
+                page += 1
+                self.update_state(state="PROGRESS",
+                                  meta={"progress": "get subscribers", "page": page, "total": len(subscribers)})
+            else:
+                break
+        except Exception as e:
+            print(e)
+            self.update_state(stage="FAILURE", meta={"error": str(e)})
+            return {"success": 0, "failed": "all", "total": len(subscribers), "error": str(e)}
+    print("subscribers", subscribers)
     success = 0
     failed = 0
     self.update_state(state="PROGRESS", meta={"progress": "get customers", "total": len(subscribers)})
