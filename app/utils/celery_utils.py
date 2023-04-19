@@ -23,11 +23,13 @@ def get_task_info(task_id):
     return task info for the given task_id
     """
     task_result = AsyncResult(task_id)
-    result = {
-        "task_id": task_id,
-        "task_status": task_result.status,
-        "task_result": task_result.result,
-        "task_state": task_result.state,
-        "task_traceback": task_result.traceback
-    }
-    return result
+    try:
+        result = {
+            "task_id": task_id,
+            "task_status": task_result.status,
+            "task_result": task_result.result
+        }
+        return result
+    except Exception as e:
+        print("Task", str(task_id), e)
+        return {"error": str(e)}
