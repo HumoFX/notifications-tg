@@ -4,6 +4,7 @@ import re
 import textwrap
 
 import requests
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from fastapi.responses import JSONResponse, ujson
 import asyncio
@@ -11,6 +12,16 @@ import aiohttp
 from pydantic import BaseSettings, EmailStr, SecretStr, validator
 
 from app.schemas.error import AlertMessage
+import os
+from functools import lru_cache
+from kombu import Queue
+
+
+def route_task(name, args, kwargs, options, task=None, **kw):
+    if ":" in name:
+        queue, _ = name.split(":")
+        return {"queue": queue}
+    return {"queue": "celery"}
 
 
 class Settings(BaseSettings):
@@ -21,6 +32,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str
     POSTGRES_PASSWORD: SecretStr
     POSTGRES_URI: Optional[str] = None
+    BASE_URL: str
 
     @validator("POSTGRES_URI", pre=True)
     def validate_postgres_conn(cls, v: Optional[str], values: Dict[str, Any]) -> str:
@@ -41,13 +53,24 @@ class Settings(BaseSettings):
     # SECRET_KEY: SecretStr
     # ACCESS_TOKEN_EXPIRE_MINUTES: int
 
-    # REDIS_HOST: str
-    # REDIS_PORT: int
+    REDIS_HOST: str
+    REDIS_PORT: int
 
     BOT_TOKEN: str
     ALERT_BOT_TOKEN: str
     ALERT_CHANNEL_ID: str
     proxy = {"http": "http://192.168.152.200:8080", "https": "http://192.168.152.200:8080"}
+    # proxy = {}
+
+    CELERY_BROKER_URL: str = os.environ.get("CELERY_BROKER_URL", "redis://127.0.0.1:6379/1")
+    CELERY_RESULT_BACKEND: str = os.environ.get("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/1")
+
+    CELERY_TASK_QUEUES: list = (
+        # default queue
+        Queue("notifications"),
+    )
+
+    CELERY_TASK_ROUTES = (route_task,)
 
     def get_bot_token(self):
         self.BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -100,6 +123,11 @@ class BotNotify:
         url = self.url + "sendMessage?chat_id={}&text={}&parse_mode={}".format(chat_id, text, parse_mode)
         response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy)
         return response
+
+    def sync_send_message(self, chat_id: str, text: str, parse_mode: str = 'Markdown'):
+        url = self.url + "sendMessage?chat_id={}&text={}&parse_mode={}".format(chat_id, text, parse_mode)
+        response = requests.post(url, headers={"Content-Type": "application/json"}, proxies=settings.proxy)
+        return response.json()
 
     async def send_alert_message(self, error: AlertMessage):
         text = f"<i>🚨 {error.criticalityLevel}</i>\n"
@@ -161,8 +189,14 @@ class BotNotify:
         return await self.send_message(chat_id, message)
 
 
+@dataclass
+class BotNotifyV2:
+    token: str = settings.BOT_TOKEN
+    url: str = "https://api.telegram.org/bot{}/".format(settings.BOT_TOKEN)
+    alert_url: str = "https://api.telegram.org/bot{}/".format(settings.ALERT_BOT_TOKEN)
+    alert_channel: str = settings.ALERT_CHANNEL_ID
 
-
-
-
-
+    def sync_send_message(self, chat_id: str, text: str, parse_mode: str = 'HTML'):
+        url = self.url + "sendMessage?chat_id={}&text={}&parse_mode={}".format(chat_id, text, parse_mode)
+        response = requests.post(url, headers={"Content-Type": "application/json"}, proxies=settings.proxy)
+        return response.json()

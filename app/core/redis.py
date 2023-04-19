@@ -1,5 +1,10 @@
-from typing import Optional
+from typing import AsyncIterator
 
-from arq.connections import ArqRedis
+from aioredis import Redis
+from app.core.config import settings
 
-pool: Optional[ArqRedis] = None
+
+def create_redis_pool():
+    """Create redis pool."""
+    redis = Redis.from_url(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
+    return redis
