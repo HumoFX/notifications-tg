@@ -85,7 +85,8 @@ async def get_user_by_customer_id(customer_id: int):
         return customer
 
 
-@shared_task(bind=True, name='notifications:send_batch_notification_to_topic_task_v2')
+@shared_task(bind=True, name='notifications:send_batch_notification_to_topic_task_v2',
+             autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 5})
 def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: BotNotify):
     page = 1
     subscribers = []
