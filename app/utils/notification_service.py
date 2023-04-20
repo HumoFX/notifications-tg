@@ -84,9 +84,22 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
     failed = 0
     customers = []
     for subscriber in subscribers:
-        customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
-        if customer:
-            customers.append(customer)
+        try:
+            loop = asyncio.get_event_loop()
+            print("loop", loop)
+        except Exception as e:
+            print("no loop")
+            self.update_state(state="FAILURE", meta={"error": str(e)})
+
+            return {"success": success, "failed": failed, "total": len(subscribers)}
+        try:
+            customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
+            if customer:
+                customers.append(customer)
+        except Exception as e:
+            print(str(e))
+            self.update_state(state="FAILURE", meta={"error": str(e)})
+            return {"success": success, "failed": failed, "total": len(subscribers)}
     if not customers:
         self.update_state(state="FAILURE", meta={"progress": "customers not found"})
         return {"success": success, "failed": failed, "total": len(subscribers)}
@@ -142,9 +155,15 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
         self.update_state(state="FAILURE", meta={"progress": "subscribers not found or failed to get"})
         return {"success": success, "failed": failed, "total": len(subscribers)}
     for subscriber in subscribers:
-        customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
-        if customer:
-            customers.append(customer)
+        try:
+            customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
+            if customer:
+                customers.append(customer)
+        except Exception as e:
+            print(str(e))
+            self.update_state(state="FAILURE", meta={"error": str(e)})
+            return {"success": success, "failed": failed, "total": len(subscribers)}
+
     if not customers:
         self.update_state(state="FAILURE", meta={"progress": "customers not found"})
         return {"success": success, "failed": failed, "total": len(subscribers)}
