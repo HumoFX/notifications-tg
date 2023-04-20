@@ -102,7 +102,7 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
             loop = get_or_create_loop()
         except Exception as e:
             logger.error("no loop")
-            self.update_state(state="FAILURE", meta=str(e))
+            self.update_state(state="FAILURE", meta={"error": str(e)})
             raise Ignore()
         try:
             customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
@@ -111,10 +111,10 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
         except Exception as e:
             logger.error("getting customers failed")
             logger.error(str(e))
-            self.update_state(state="FAILURE", meta=str(e))
+            self.update_state(state="FAILURE", meta={"error": str(e)})
             raise Ignore()
     if not customers:
-        self.update_state(state="FAILURE", meta="customers not found")
+        self.update_state(state="FAILURE", meta={"error":"customers not found"})
         logger.error("customers not found")
         raise Ignore()
 
@@ -147,7 +147,12 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     subscribers = []
     self.update_state(state="PROGRESS", meta={"progress": "get subscribers", "page": page, "total": 0})
     while True:
-        print("get subscribers")
+        try:
+            loop = get_or_create_loop()
+        except Exception as e:
+            logger.error("no loop")
+            self.update_state(state="FAILURE", meta={"error": str(e)})
+            raise Ignore()
         try:
             response = loop.run_until_complete(get_topic_subscribers(topic, page))
             if response and response.get("data"):
@@ -159,7 +164,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
                 break
         except Exception as e:
             print(e)
-            self.update_state(stage="FAILURE", meta=str(e))
+            self.update_state(stage="FAILURE", meta={"error": str(e)})
             raise Ignore()
     print("subscribers", subscribers)
     success = 0
@@ -168,7 +173,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     customers = []
 
     if not subscribers:
-        self.update_state(state="FAILURE", meta="subscribers not found or failed to get")
+        self.update_state(state="FAILURE", meta={"error":"subscribers not found or failed to get"})
         raise Ignore()
     for subscriber in subscribers:
         try:
@@ -177,11 +182,11 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
                 customers.append(customer)
         except Exception as e:
             print(str(e))
-            self.update_state(state="FAILURE", meta=str(e))
+            self.update_state(state="FAILURE", meta={"error": str(e)})
             raise Ignore()
 
     if not customers:
-        self.update_state(state="FAILURE", meta="customers not found")
+        self.update_state(state="FAILURE", meta={"error": "customers not found"})
         raise Ignore()
 
     for customer in customers:
