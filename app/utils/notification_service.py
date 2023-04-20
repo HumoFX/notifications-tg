@@ -148,13 +148,13 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     page = 1
     subscribers = []
     self.update_state(state="PROGRESS", meta={"progress": "get subscribers", "page": page, "total": 0})
+    try:
+        loop = get_or_create_loop()
+    except Exception as e:
+        logger.error("no loop")
+        self.update_state(state="REVOKE", meta={"error": str(e)})
+        raise Ignore()
     while True:
-        try:
-            loop = get_or_create_loop()
-        except Exception as e:
-            logger.error("no loop")
-            self.update_state(state="REVOKE", meta={"error": str(e)})
-            raise Ignore()
         try:
             response = loop.run_until_complete(get_topic_subscribers(topic, page))
             if response and response.get("data"):
@@ -165,10 +165,8 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
             else:
                 break
         except Exception as e:
-            print(e)
             self.update_state(stage="REVOKE", meta={"error": str(e)})
             raise Ignore()
-    print("subscribers", subscribers)
     success = 0
     failed = 0
     self.update_state(state="PROGRESS", meta={"progress": "get customers", "total": len(subscribers)})
@@ -183,7 +181,6 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
             if customer:
                 customers.append(customer)
         except Exception as e:
-            print(str(e))
             self.update_state(state="REVOKE", meta={"error": str(e)})
             raise Ignore()
 
