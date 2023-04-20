@@ -97,24 +97,22 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
     for subscriber in subscribers:
         try:
             loop = get_or_create_loop()
-            logger.info("loop", loop)
         except Exception as e:
             logger.error("no loop")
-            self.update_state(state="FAILURE", meta={"error": str(e)})
+            self.update_state(state="FAILURE", meta=str(e))
 
             return {"success": success, "failed": failed, "total": len(subscribers)}
         try:
-            logger.info("getting customers")
             customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
             if customer:
                 customers.append(customer)
         except Exception as e:
             logger.error("getting customers failed")
             logger.error(str(e))
-            self.update_state(state="FAILURE", meta={"error": str(e)})
+            self.update_state(state="FAILURE", meta=str(e))
             return {"success": success, "failed": failed, "total": len(subscribers)}
     if not customers:
-        self.update_state(state="FAILURE", meta={"progress": "customers not found"})
+        self.update_state(state="FAILURE", meta="customers not found")
         logger.error("customers not found")
         return {"success": success, "failed": failed, "total": len(subscribers)}
 
@@ -159,7 +157,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
                 break
         except Exception as e:
             print(e)
-            self.update_state(stage="FAILURE", meta={"error": str(e)})
+            self.update_state(stage="FAILURE", meta=str(e))
             return {"success": 0, "failed": "all", "total": len(subscribers), "error": str(e)}
     print("subscribers", subscribers)
     success = 0
@@ -168,7 +166,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     customers = []
 
     if not subscribers:
-        self.update_state(state="FAILURE", meta={"progress": "subscribers not found or failed to get"})
+        self.update_state(state="FAILURE", meta="subscribers not found or failed to get")
         return {"success": success, "failed": failed, "total": len(subscribers)}
     for subscriber in subscribers:
         try:
@@ -177,11 +175,11 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
                 customers.append(customer)
         except Exception as e:
             print(str(e))
-            self.update_state(state="FAILURE", meta={"error": str(e)})
+            self.update_state(state="FAILURE", meta=str(e))
             return {"success": success, "failed": failed, "total": len(subscribers)}
 
     if not customers:
-        self.update_state(state="FAILURE", meta={"progress": "customers not found"})
+        self.update_state(state="FAILURE", meta="customers not found")
         return {"success": success, "failed": failed, "total": len(subscribers)}
 
     for customer in customers:
