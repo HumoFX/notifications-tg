@@ -115,11 +115,14 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
             return {"success": success, "failed": failed, "total": len(subscribers)}
     if not customers:
         self.update_state(state="FAILURE", meta={"progress": "customers not found"})
+        logger.error("customers not found")
         return {"success": success, "failed": failed, "total": len(subscribers)}
 
     self.update_state(state="PROGRESS", meta={"progress": "get customers"})
     for subscriber in customers:
+        logger.info("sending message")
         message = bot.sync_send_message(chat_id=subscriber.user_id, text=text)
+        logger.info(message)
         if message.get("ok"):
             success += 1
         else:
