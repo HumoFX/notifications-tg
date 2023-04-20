@@ -33,6 +33,8 @@ async def get_topic_subscribers(topic: str, page: int = 1):
             if response.status == 200:
                 if await response.json():
                     return await response.json()
+
+            logger.info(f"response status {response.status}")
             return None
 
 
