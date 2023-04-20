@@ -7,6 +7,7 @@ from app.models.users import UserCustomer
 from celery import shared_task
 from time import sleep
 from app.core.database import db
+from loguru import logger
 
 tasks = {}
 loop = asyncio.new_event_loop()
@@ -43,6 +44,7 @@ async def get_all_subscribers(self, topic: str):
     subscribers = []
     while True:
         response = await get_topic_subscribers(topic, page)
+        logger.info(response)
         if response and response.get("data"):
             subscribers.extend(response.get("data"))
             page += 1
@@ -93,10 +95,12 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
         #
         #     return {"success": success, "failed": failed, "total": len(subscribers)}
         try:
+            logger.info("getting customers")
             customer = asyncio.run((get_user_by_customer_id(subscriber.get("customerId"))))
             if customer:
                 customers.append(customer)
         except Exception as e:
+            logger.error("getting customers failed")
             print(str(e))
             self.update_state(state="FAILURE", meta={"error": str(e)})
             return {"success": success, "failed": failed, "total": len(subscribers)}
