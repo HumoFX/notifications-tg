@@ -19,10 +19,21 @@ bot = BotNotify()
 
 @router.post("/", response_model=ResponseBody, status_code=201)
 async def create_task(notification: Notification):
+    # if notification.topicName:
+    #     try:
+    #         text = f"*{notification.title}*\n{notification.body}"
+    #         task_uuid = send_batch_notification_to_topic_task_v2.delay(topic=notification.topicName, text=text, bot=bot)
+    #         return ResponseBody(status=0, data={"message": "success", "task_uuid": task_uuid.id})
+    #     except Exception as e:
+    #         return ResponseBody(status=1001, errorMessage=str(e))
     if notification.topicName:
+        subscribers = await get_all_subscribers(topic=notification.topicName)
+        print(subscribers)
+        customers = await customer_find_from_subscribers(subscribers=subscribers)
+        print(customers)
         try:
             text = f"*{notification.title}*\n{notification.body}"
-            task_uuid = send_batch_notification_to_topic_task_v2.delay(topic=notification.topicName, text=text, bot=bot)
+            task_uuid = send_batch_notification_to_topic_task.delay(subscribers=customers, text=text, bot=bot)
             return ResponseBody(status=0, data={"message": "success", "task_uuid": task_uuid.id})
         except Exception as e:
             return ResponseBody(status=1001, errorMessage=str(e))
