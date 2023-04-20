@@ -10,7 +10,14 @@ from app.core.database import db
 from loguru import logger
 
 tasks = {}
-loop = asyncio.new_event_loop()
+
+def get_or_create_loop():
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop
 
 
 async def get_topic_subscribers(topic: str, page: int = 1):
@@ -89,10 +96,7 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
     customers = []
     for subscriber in subscribers:
         try:
-            loop = asyncio.get_event_loop()
-            if not loop:
-                loop = asyncio.new_event_loop()
-                logger.info("created loop")
+            loop = get_or_create_loop()
             logger.info("loop", loop)
         except Exception as e:
             logger.error("no loop")
