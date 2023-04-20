@@ -78,6 +78,32 @@ def send_batch_notification_to_topic_task(self, subscribers: list, text: str, bo
                                 "success": success, "failed": failed, "total": len(subscribers)})
     return {"success": success, "failed": failed, "total": len(subscribers)}
 
+@shared_task(bind=True, name='notifications:send_batch_notification_to_topic_task_v3')
+def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str, bot: BotNotify):
+    success = 0
+    failed = 0
+    customers = []
+    for subscriber in subscribers:
+        customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
+        if customer:
+            customers.append(customer)
+    if not customers:
+        self.update_state(state="FAILURE", meta={"progress": "customers not found"})
+        return {"success": success, "failed": failed, "total": len(subscribers)}
+
+    self.update_state(state="PROGRESS", meta={"progress": "get customers"})
+    for subscriber in customers:
+        message = bot.sync_send_message(chat_id=subscriber.user_id, text=text)
+        if message.get("ok"):
+            success += 1
+        else:
+            failed += 1
+        sleep(0.05)
+        self.update_state(state="PROGRESS",
+                          meta={"progress": f"send notification to {subscriber.user_id}",
+                                "success": success, "failed": failed, "total": len(subscribers)})
+    return {"success": success, "failed": failed, "total": len(subscribers)}
+
 
 async def get_user_by_customer_id(customer_id: int):
     async with db.with_bind(settings.POSTGRES_URI) as conn:

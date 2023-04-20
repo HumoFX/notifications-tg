@@ -10,7 +10,8 @@ from app.schemas.notification import Notification
 from app.schemas.reponse import ResponseBody
 from app.core.config import BotNotify, settings, BotNotifyV2
 from app.utils.notification_service import get_all_subscribers, get_status, \
-    customer_find_from_subscribers, send_batch_notification_to_topic_task_v2, send_batch_notification_to_topic_task
+    customer_find_from_subscribers, send_batch_notification_to_topic_task_v2, send_batch_notification_to_topic_task, \
+    send_batch_notification_to_topic_task_v3
 from app.utils.celery_utils import get_task_info
 
 router = APIRouter(prefix="/notification", tags=["notification"])
@@ -33,7 +34,7 @@ async def create_task(notification: Notification):
         print(customers)
         try:
             text = f"*{notification.title}*\n{notification.body}"
-            task_uuid = send_batch_notification_to_topic_task.delay(subscribers=customers, text=text, bot=bot)
+            task_uuid = send_batch_notification_to_topic_task_v3.delay(subscribers=subscribers, text=text, bot=bot)
             return ResponseBody(status=0, data={"message": "success", "task_uuid": task_uuid.id})
         except Exception as e:
             return ResponseBody(status=1001, errorMessage=str(e))
