@@ -88,14 +88,17 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
     failed = 0
     customers = []
     for subscriber in subscribers:
-        # try:
-        #     loop = asyncio.get_event_loop()
-        #     print("loop", loop)
-        # except Exception as e:
-        #     print("no loop")
-        #     self.update_state(state="FAILURE", meta={"error": str(e)})
-        #
-        #     return {"success": success, "failed": failed, "total": len(subscribers)}
+        try:
+            loop = asyncio.get_event_loop()
+            if not loop:
+                loop = asyncio.new_event_loop()
+                logger.info("created loop")
+            logger.info("loop", loop)
+        except Exception as e:
+            logger.error("no loop")
+            self.update_state(state="FAILURE", meta={"error": str(e)})
+
+            return {"success": success, "failed": failed, "total": len(subscribers)}
         try:
             logger.info("getting customers")
             customer = asyncio.run((get_user_by_customer_id(subscriber.get("customerId"))))
@@ -103,7 +106,7 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
                 customers.append(customer)
         except Exception as e:
             logger.error("getting customers failed")
-            print(str(e))
+            logger.error(str(e))
             self.update_state(state="FAILURE", meta={"error": str(e)})
             return {"success": success, "failed": failed, "total": len(subscribers)}
     if not customers:
