@@ -84,16 +84,16 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
     failed = 0
     customers = []
     for subscriber in subscribers:
+        # try:
+        #     loop = asyncio.get_event_loop()
+        #     print("loop", loop)
+        # except Exception as e:
+        #     print("no loop")
+        #     self.update_state(state="FAILURE", meta={"error": str(e)})
+        #
+        #     return {"success": success, "failed": failed, "total": len(subscribers)}
         try:
-            loop = asyncio.get_event_loop()
-            print("loop", loop)
-        except Exception as e:
-            print("no loop")
-            self.update_state(state="FAILURE", meta={"error": str(e)})
-
-            return {"success": success, "failed": failed, "total": len(subscribers)}
-        try:
-            customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
+            customer = asyncio.run((get_user_by_customer_id(subscriber.get("customerId"))))
             if customer:
                 customers.append(customer)
         except Exception as e:
