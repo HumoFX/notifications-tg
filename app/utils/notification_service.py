@@ -105,7 +105,7 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
             return {"success": success, "failed": failed, "total": len(subscribers)}
         try:
             logger.info("getting customers")
-            customer = asyncio.run((get_user_by_customer_id(subscriber.get("customerId"))))
+            customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
             if customer:
                 customers.append(customer)
         except Exception as e:
