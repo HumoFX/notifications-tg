@@ -2,7 +2,7 @@ import aiohttp
 import asyncio
 import uuid
 
-from celery.exceptions import Ignore
+from celery.exceptions import Ignore, Reject
 
 from app.core.config import settings, BotNotify, BotNotifyV2
 from app.core.redis import create_redis_pool as redis
@@ -13,6 +13,7 @@ from app.core.database import db
 from loguru import logger
 
 tasks = {}
+
 
 def get_or_create_loop():
     try:
@@ -92,6 +93,7 @@ def send_batch_notification_to_topic_task(self, subscribers: list, text: str, bo
                                 "success": success, "failed": failed, "total": len(subscribers)})
     return {"success": success, "failed": failed, "total": len(subscribers)}
 
+
 @shared_task(bind=True, name='notifications:send_batch_notification_to_topic_task_v3')
 def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str, bot: BotNotify):
     success = 0
@@ -102,7 +104,7 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
             loop = get_or_create_loop()
         except Exception as e:
             logger.error("no loop")
-            self.update_state(state="FAILURE", meta={"error": str(e)})
+            self.update_state(state="REVOKE", meta={"error": str(e)})
             raise Ignore()
         try:
             customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
@@ -111,10 +113,10 @@ def send_batch_notification_to_topic_task_v3(self, subscribers: list, text: str,
         except Exception as e:
             logger.error("getting customers failed")
             logger.error(str(e))
-            self.update_state(state="FAILURE", meta={"error": str(e)})
+            self.update_state(state="REVOKE", meta={"error": str(e)})
             raise Ignore()
     if not customers:
-        self.update_state(state="FAILURE", meta={"error":"customers not found"})
+        self.update_state(state="REVOKE", meta={"error": "customers not found"})
         logger.error("customers not found")
         raise Ignore()
 
@@ -151,7 +153,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
             loop = get_or_create_loop()
         except Exception as e:
             logger.error("no loop")
-            self.update_state(state="FAILURE", meta={"error": str(e)})
+            self.update_state(state="REVOKE", meta={"error": str(e)})
             raise Ignore()
         try:
             response = loop.run_until_complete(get_topic_subscribers(topic, page))
@@ -164,7 +166,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
                 break
         except Exception as e:
             print(e)
-            self.update_state(stage="FAILURE", meta={"error": str(e)})
+            self.update_state(stage="REVOKE", meta={"error": str(e)})
             raise Ignore()
     print("subscribers", subscribers)
     success = 0
@@ -173,7 +175,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     customers = []
 
     if not subscribers:
-        self.update_state(state="FAILURE", meta={"error":"subscribers not found or failed to get"})
+        self.update_state(state="REVOKE", meta={"error": "subscribers not found or failed to get"})
         raise Ignore()
     for subscriber in subscribers:
         try:
@@ -182,11 +184,11 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
                 customers.append(customer)
         except Exception as e:
             print(str(e))
-            self.update_state(state="FAILURE", meta={"error": str(e)})
+            self.update_state(state="REVOKE", meta={"error": str(e)})
             raise Ignore()
 
     if not customers:
-        self.update_state(state="FAILURE", meta={"error": "customers not found"})
+        self.update_state(state="REVOKE", meta={"error": "customers not found"})
         raise Ignore()
 
     for customer in customers:
