@@ -190,7 +190,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
 
     for customer in customers:
         try:
-            message = bot.sync_send_message(chat_id=customer.user_id, text=text)
+            message = loop.run_until_complete(bot.send_message(chat_id=customer.user_id, text=text, parse_mode='Markdown'))
         except Exception as e:
             logger.error("CATCH ERROR {}: {}".format(customer, str(e)))
             message = {}
