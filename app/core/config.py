@@ -125,8 +125,14 @@ class BotNotify:
         return response
 
     def sync_send_message(self, chat_id: str, text: str, parse_mode: str = 'Markdown'):
+        headers = requests.utils.default_headers()
+        headers.update(
+            {
+                'User-Agent': 'My User Agent 1.0',
+            }
+        )
         url = self.url + "sendMessage?chat_id={}&text={}&parse_mode={}".format(chat_id, text, parse_mode)
-        response = requests.post(url, headers={"Content-Type": "application/json"}, proxies=settings.proxy)
+        response = requests.post(url, headers=headers, proxies=settings.proxy)
         return response.json()
 
     async def send_alert_message(self, error: AlertMessage):

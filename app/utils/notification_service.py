@@ -191,14 +191,14 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     for customer in customers:
         try:
             message = bot.sync_send_message(chat_id=customer.user_id, text=text)
-            if message.get("ok"):
-                success += 1
-            else:
-                failed += 1
         except Exception as e:
             logger.error("CATCH ERROR {}: {}".format(customer, str(e)))
+            message = {}
+        if message.get("ok"):
+            success += 1
+        else:
             failed += 1
-        sleep(0.05)
+        sleep(0.07)
         self.update_state(state="PROGRESS",
                           meta={"progress": f"send notification to {customer.user_id}",
                                 "success": success, "failed": failed, "total": len(customers)})
