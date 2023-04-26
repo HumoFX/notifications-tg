@@ -170,7 +170,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     success = 0
     failed = 0
     self.update_state(state="PROGRESS", meta={"progress": "get customers", "total": len(subscribers)})
-    customers = []
+    customers = set()
 
     if not subscribers:
         self.update_state(state="REVOKE", meta={"error": "subscribers not found or failed to get"})
@@ -179,7 +179,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
         try:
             customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
             if customer:
-                customers.append(customer)
+                customers.add(customer)
         except Exception as e:
             self.update_state(state="REVOKE", meta={"error": str(e)})
             raise Ignore()
@@ -197,8 +197,8 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
                 failed += 1
         except Exception as e:
             logger.error("CATCH ERROR {}: {}".format(customer, str(e)))
-            pass
-        sleep(0.07)
+            failed += 1
+        sleep(0.05)
         self.update_state(state="PROGRESS",
                           meta={"progress": f"send notification to {customer.user_id}",
                                 "success": success, "failed": failed, "total": len(customers)})
