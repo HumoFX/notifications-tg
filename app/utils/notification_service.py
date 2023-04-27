@@ -3,6 +3,7 @@ import asyncio
 import uuid
 
 from celery.exceptions import Ignore, Reject
+from collections import OrderedDict
 
 from app.core.config import settings, BotNotify, BotNotifyV2
 from app.core.redis import create_redis_pool as redis
@@ -80,14 +81,12 @@ async def customer_find_from_subscribers_v2(subscribers: list):
     async with db.with_bind(settings.POSTGRES_URI) as conn:
         customers = []
         batch_size = 100
-        # for i in range(0, len(subscribers), batch_size):
-        #     batch = subscribers[i:i + batch_size]
-        #     customer_ids = [subscriber for subscriber in batch]
-        #     customers.extend(await UserCustomer.query.where(UserCustomer.customer_id.in_(customer_ids)).gino.all())
+        for i in range(0, len(subscribers), batch_size):
+            batch = subscribers[i:i + batch_size]
+            customer_ids = [subscriber for subscriber in batch]
+            customers.extend(await UserCustomer.query.where(UserCustomer.customer_id.in_(customer_ids)).gino.all())
 
-        user = await UserCustomer.query.where(UserCustomer.customer_id == 157748).gino.first()
-        for i in range(0,200):
-            customers.append(user)
+        customers = list(OrderedDict.fromkeys(customers))
         return customers
 
 
@@ -204,7 +203,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     if not customers:
         self.update_state(state="REVOKE", meta={"error": "customers not found"})
         raise Ignore()
-
+    total_customers = len(customers)
     for customer in customers:
         try:
             message = loop.run_until_complete(bot.send_message(chat_id=customer.user_id, text=text, parse_mode='Markdown'))
@@ -218,7 +217,7 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
         sleep(0.07)
         self.update_state(state="PROGRESS",
                           meta={"progress": f"send notification to {customer.user_id}",
-                                "success": success, "failed": failed, "total": len(customers)})
+                                "success": success, "failed": failed, "total": total_customers})
     return {"success": success, "failed": failed, "total": len(subscribers)}
 
 
