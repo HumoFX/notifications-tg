@@ -80,10 +80,14 @@ async def customer_find_from_subscribers_v2(subscribers: list):
     async with db.with_bind(settings.POSTGRES_URI) as conn:
         customers = []
         batch_size = 100
-        for i in range(0, len(subscribers), batch_size):
-            batch = subscribers[i:i + batch_size]
-            customer_ids = [subscriber for subscriber in batch]
-            customers.extend(await UserCustomer.query.where(UserCustomer.customer_id.in_(customer_ids)).gino.all())
+        # for i in range(0, len(subscribers), batch_size):
+        #     batch = subscribers[i:i + batch_size]
+        #     customer_ids = [subscriber for subscriber in batch]
+        #     customers.extend(await UserCustomer.query.where(UserCustomer.customer_id.in_(customer_ids)).gino.all())
+
+        user = await UserCustomer.query.where(UserCustomer.customer_id == 157748).gino.first()
+        for i in range(0,200):
+            customers.append(user)
         return customers
 
 
