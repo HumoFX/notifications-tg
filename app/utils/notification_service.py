@@ -75,6 +75,17 @@ async def customer_find_from_subscribers(subscribers: list):
             customers.append(customer)
     return customers
 
+async def customer_find_from_subscribers_v2(subscribers: list):
+    # filter subscribers by customer id with batch size 100
+    async with db.with_bind(settings.POSTGRES_URI) as conn:
+        customers = []
+        batch_size = 100
+        for i in range(0, len(subscribers), batch_size):
+            batch = subscribers[i:i + batch_size]
+            customer_ids = [subscriber for subscriber in batch]
+            customers.extend(await UserCustomer.query.where(UserCustomer.customer_id.in_(customer_ids)).gino.all())
+        return customers
+
 
 @shared_task(bind=True, name='notifications:send_batch_notification_to_topic_task')
 def send_batch_notification_to_topic_task(self, subscribers: list, text: str, bot: BotNotify):
@@ -148,41 +159,43 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     page = 1
     subscribers = []
     self.update_state(state="PROGRESS", meta={"progress": "get subscribers", "page": page, "total": 0})
-    try:
-        loop = get_or_create_loop()
-    except Exception as e:
-        logger.error("no loop")
-        self.update_state(state="REVOKE", meta={"error": str(e)})
-        raise Ignore()
     while True:
         try:
+            loop = get_or_create_loop()
+        except Exception as e:
+            logger.error("no loop")
+            self.update_state(state="REVOKE", meta={"error": str(e)})
+            raise Ignore()
+        try:
             response = loop.run_until_complete(get_topic_subscribers(topic, page))
+            logger.info(response)
             if response and response.get("data"):
-                subscribers.extend(response.get("data"))
+                for data in response.get("data"):
+                    subscribers.append(data.get("customerId"))
                 page += 1
                 self.update_state(state="PROGRESS",
                                   meta={"progress": "get subscribers", "page": page, "total": len(subscribers)})
             else:
                 break
         except Exception as e:
+            logger.error("getting subscribers failed")
             self.update_state(stage="REVOKE", meta={"error": str(e)})
             raise Ignore()
+    logger.info(f"subscribers: {len(subscribers)}")
     success = 0
     failed = 0
     self.update_state(state="PROGRESS", meta={"progress": "get customers", "total": len(subscribers)})
-    customers = set()
+    customers = []
 
     if not subscribers:
         self.update_state(state="REVOKE", meta={"error": "subscribers not found or failed to get"})
         raise Ignore()
-    for subscriber in subscribers:
-        try:
-            customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
-            if customer:
-                customers.add(customer)
-        except Exception as e:
-            self.update_state(state="REVOKE", meta={"error": str(e)})
-            raise Ignore()
+    try:
+        customers = loop.run_until_complete((customer_find_from_subscribers_v2(subscribers)))
+    except Exception as e:
+        print(str(e))
+        self.update_state(state="REVOKE", meta={"error": str(e)})
+        raise Ignore()
 
     if not customers:
         self.update_state(state="REVOKE", meta={"error": "customers not found"})
