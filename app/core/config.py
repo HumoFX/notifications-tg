@@ -60,8 +60,8 @@ class Settings(BaseSettings):
     ALERT_BOT_TOKEN: str
     ALERT_CHANNEL_ID: str
     NEW_ALERT_GROUP_ID: str
-    # proxy = {"http": "http://192.168.152.200:8080", "https": "http://192.168.152.200:8080"}
-    proxy = {}
+    proxy = {"http": "http://192.168.152.200:8080", "https": "http://192.168.152.200:8080"}
+    # proxy = {}
 
     CELERY_BROKER_URL: str = os.environ.get("CELERY_BROKER_URL", "redis://127.0.0.1:6379/1")
     CELERY_RESULT_BACKEND: str = os.environ.get("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/1")
