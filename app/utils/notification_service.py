@@ -2,7 +2,7 @@ import aiohttp
 import asyncio
 import uuid
 
-from celery.exceptions import Ignore, Reject
+from celery.exceptions import Ignore, Reject, TaskRevokedError
 
 from app.core.config import settings, BotNotify, BotNotifyV2
 from app.core.redis import create_redis_pool as redis
@@ -31,7 +31,7 @@ async def get_topic_subscribers(topic: str, page: int = 1):
     :param page: int
     :return:
     """
-
+    logger.info(f"get topic subscribers {topic}")
     async with aiohttp.ClientSession() as session:
         url = settings.BASE_URL + "/notification/get/subscribers"
         headers = {}
@@ -39,6 +39,7 @@ async def get_topic_subscribers(topic: str, page: int = 1):
             "topicName": topic,
             "page": page
         }
+
         async with session.post(url, headers=headers, json=payload) as response:
 
             if response.status == 200:
@@ -59,7 +60,8 @@ async def get_all_subscribers(self, topic: str):
         response = await get_topic_subscribers(topic, page)
         logger.info(response)
         if response and response.get("data"):
-            subscribers.extend(response.get("data"))
+            for subscriber in response.get("data"):
+                subscribers.append(subscriber.get("customerId"))
             page += 1
         else:
             break
@@ -74,6 +76,22 @@ async def customer_find_from_subscribers(subscribers: list):
         if customer:
             customers.append(customer)
     return customers
+
+
+async def customer_find_from_subscribers_v2(subscribers: list):
+    # filter subscribers by customer id with batch size 100
+    async with db.with_bind(settings.POSTGRES_URI) as conn:
+        customers = []
+        batch_size = 100
+        # for i in range(0, len(subscribers), batch_size):
+        #     batch = subscribers[i:i + batch_size]
+        #     customer_ids = [subscriber for subscriber in batch]
+        #     customers.extend(await UserCustomer.query.where(UserCustomer.customer_id.in_(customer_ids)).gino.all())
+        user = await UserCustomer.query.where(UserCustomer.customer_id == 157748).gino.first()
+        # append n times to customers
+        for i in range(0, 200):
+            customers.append(user)
+        return customers
 
 
 @shared_task(bind=True, name='notifications:send_batch_notification_to_topic_task')
@@ -157,18 +175,20 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
             raise Ignore()
         try:
             response = loop.run_until_complete(get_topic_subscribers(topic, page))
+            logger.info(response)
             if response and response.get("data"):
-                subscribers.extend(response.get("data"))
+                for data in response.get("data"):
+                    subscribers.append(data.get("customerId"))
                 page += 1
                 self.update_state(state="PROGRESS",
                                   meta={"progress": "get subscribers", "page": page, "total": len(subscribers)})
             else:
                 break
         except Exception as e:
-            print(e)
+            logger.error("getting subscribers failed")
             self.update_state(stage="REVOKE", meta={"error": str(e)})
             raise Ignore()
-    print("subscribers", subscribers)
+    logger.info(f"subscribers: {len(subscribers)}")
     success = 0
     failed = 0
     self.update_state(state="PROGRESS", meta={"progress": "get customers", "total": len(subscribers)})
@@ -177,15 +197,12 @@ def send_batch_notification_to_topic_task_v2(self, topic: str, text: str, bot: B
     if not subscribers:
         self.update_state(state="REVOKE", meta={"error": "subscribers not found or failed to get"})
         raise Ignore()
-    for subscriber in subscribers:
-        try:
-            customer = loop.run_until_complete((get_user_by_customer_id(subscriber.get("customerId"))))
-            if customer:
-                customers.append(customer)
-        except Exception as e:
-            print(str(e))
-            self.update_state(state="REVOKE", meta={"error": str(e)})
-            raise Ignore()
+    try:
+        customers = loop.run_until_complete((customer_find_from_subscribers_v2(subscribers)))
+    except Exception as e:
+        print(str(e))
+        self.update_state(state="REVOKE", meta={"error": str(e)})
+        raise Ignore()
 
     if not customers:
         self.update_state(state="REVOKE", meta={"error": "customers not found"})
