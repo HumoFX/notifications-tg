@@ -88,7 +88,7 @@ async def error_handler_v2(error: AlertMessageV2):
     # get redis data by key
     data = await redis().get(error.pinfl)
     str_date_now = str(datetime.datetime.now())
-    error_code_key = str(error.errorCode)
+    error_code_key = f"{str(error.tag)}_{str(error.errorCode)}"
     last_message_id = None
     if data:
         data = json.loads(data)
