@@ -11,7 +11,7 @@ import asyncio
 import aiohttp
 from pydantic import BaseSettings, EmailStr, SecretStr, validator
 
-from app.schemas.error import AlertMessage
+from app.schemas.error import AlertMessage, AlertMessageV2
 import os
 from functools import lru_cache
 from kombu import Queue
@@ -59,8 +59,9 @@ class Settings(BaseSettings):
     BOT_TOKEN: str
     ALERT_BOT_TOKEN: str
     ALERT_CHANNEL_ID: str
-    proxy = {"http": "http://192.168.152.200:8080", "https": "http://192.168.152.200:8080"}
-    # proxy = {}
+    NEW_ALERT_GROUP_ID: str
+    # proxy = {"http": "http://192.168.152.200:8080", "https": "http://192.168.152.200:8080"}
+    proxy = {}
 
     CELERY_BROKER_URL: str = os.environ.get("CELERY_BROKER_URL", "redis://127.0.0.1:6379/1")
     CELERY_RESULT_BACKEND: str = os.environ.get("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/1")
@@ -118,6 +119,7 @@ class BotNotify:
         self.url = "https://api.telegram.org/bot{}/".format(self.token)
         self.alert_url = "https://api.telegram.org/bot{}/".format(settings.ALERT_BOT_TOKEN)
         self.alert_channel = settings.ALERT_CHANNEL_ID
+        self.alert_group = settings.NEW_ALERT_GROUP_ID
 
     async def send_message(self, chat_id: str, text: str, parse_mode: str = 'HTML'):
         url = self.url + "sendMessage?chat_id={}&text={}&parse_mode={}".format(chat_id, text, parse_mode)
@@ -162,6 +164,40 @@ class BotNotify:
         response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
         return response
 
+    async def send_alert_message_v2(self, error: AlertMessageV2, reply_to_message_id: int = None):
+        markup = {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "Проблема решена ✅",
+                        "callback_data": "face_id_err:{pinfl}".format(pinfl=error.pinfl),
+                    },
+                ]
+            ]
+        }
+        text = f"<i>🚨 {error.criticalityLevel}</i>\n"
+        text += f"<b>💬{error.errorMessage}</b>\n"
+        if error.errorCode:
+            text += f"Код ошибки: {error.errorCode}\n"
+        if error.system:
+            text += f"Система: <b>{error.system}</b>\n"
+        if error.pinfl:
+            text += f"🆔ПИНФЛ: {error.pinfl}\n"
+
+        text = textwrap.dedent(text)
+        data = {
+            "chat_id": self.alert_group,
+            "text": text,
+            "message_thread_id": error.tag,
+            "parse_mode": "HTML",
+            # "reply_markup": markup,
+        }
+        if reply_to_message_id:
+            data["reply_to_message_id"] = reply_to_message_id
+        url = self.alert_url + "sendMessage"
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
+        return response
+
     def sendMessage(self, chat_id: int, text: str, customer_id: int):
         markup = {
             "inline_keyboard": [
@@ -193,6 +229,11 @@ class BotNotify:
             text = text.replace(codes[0], f"<pre>{codes[0]}</pre>")
         message = f"💬 {text}"
         return await self.send_message(chat_id, message)
+
+    def get_webhook_info(self):
+        url = self.url + "getWebhookInfo"
+        response = requests.get(url, proxies=settings.proxy)
+        return response.json()
 
 
 @dataclass
