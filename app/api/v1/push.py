@@ -92,9 +92,9 @@ async def error_handler_v2(error: AlertMessageV2):
     last_message_id = None
     if data:
         data = json.loads(data)
-        last_message_id = data.get('message_ids')[-1] if data.get('message_ids') else None
         logger.info(f"redis data: {data}")
         if error_code_key in data.keys():
+            last_message_id = data[error_code_key].get('message_ids')[-1] if data.get('message_ids') else None
             data[error_code_key]['error_message'] = error.errorMessage
             data[error_code_key]['created_at'] = str_date_now
             data[error_code_key]['try_count'] = data[error_code_key]['try_count'] + 1 if data[error_code_key].get(
@@ -147,8 +147,8 @@ async def error_handler_v2(error: AlertMessageV2):
 
             data = await redis().get(error.pinfl)
             data = json.loads(data)
-            data["message_ids"] = data.get("message_ids", [])
-            data["message_ids"].append(message.get("result").get("message_id"))
+            data[error_code_key]["message_ids"] = data[error_code_key].get("message_ids", [])
+            data[error_code_key]["message_ids"].append(message.get("result").get("message_id"))
             data = json.dumps(data, ensure_ascii=False, indent=4)
             try:
                 await redis().setex(name=error.pinfl, time=604800, value=data)
