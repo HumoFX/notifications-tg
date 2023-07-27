@@ -88,13 +88,13 @@ async def error_handler_v2(error: AlertMessageV2):
     # get redis data by key
     data = await redis().get(error.pinfl)
     str_date_now = str(datetime.datetime.now())
-    error_code_key = str(error.errorCode)
+    error_code_key = f"{error.tag}_{error.errorCode}"
     last_message_id = None
     if data:
         data = json.loads(data)
-        last_message_id = data.get('message_ids')[-1] if data.get('message_ids') else None
         logger.info(f"redis data: {data}")
         if error_code_key in data.keys():
+            last_message_id = data[error_code_key].get('last_message_id')
             data[error_code_key]['error_message'] = error.errorMessage
             data[error_code_key]['created_at'] = str_date_now
             data[error_code_key]['try_count'] = data[error_code_key]['try_count'] + 1 if data[error_code_key].get(
@@ -109,12 +109,12 @@ async def error_handler_v2(error: AlertMessageV2):
                 'try_count': 1,
                 'tries_date': [str_date_now]
             }
-        data = json.dumps(data, ensure_ascii=False, indent=4)
-        logger.info(f"new data: {data}")
-        try:
-            await redis().setex(name=error.pinfl, time=604800, value=data)
-        except Exception as e:
-            logger.error(f"error: {e}")
+        # data = json.dumps(data, ensure_ascii=False, indent=4)
+        # logger.info(f"new data: {data}")
+        # try:
+        #     await redis().setex(name=error.pinfl, time=604800, value=data)
+        # except Exception as e:
+        #     logger.error(f"error: {e}")
     else:
         data = {
             error_code_key: {
@@ -124,13 +124,14 @@ async def error_handler_v2(error: AlertMessageV2):
                 'tries_date': [str_date_now]
             }
         }
-        data = json.dumps(data, ensure_ascii=False, indent=4)
-        try:
-            await redis().setex(name=error.pinfl, time=604800, value=data)
-        except Exception as e:
-            logger.error(f"error: {e}")
+        # data = json.dumps(data, ensure_ascii=False, indent=4)
+        # try:
+        #     await redis().setex(name=error.pinfl, time=604800, value=data)
+        # except Exception as e:
+        #     logger.error(f"error: {e}")
     # return ResponseBody(status=0, data={"message": "success"})
-    message = await bot.send_alert_message_v2(error, reply_to_message_id=last_message_id)
+    logger.info(f"last_message_id: {last_message_id}")
+    message = await bot.send_alert_message_v2(error, reply_to_message_id=last_message_id, try_count=data[error_code_key].get('try_count'))
     if message:
         if message.get('ok'):
             # create FaceIDAlert
@@ -144,14 +145,20 @@ async def error_handler_v2(error: AlertMessageV2):
                 error_code=error.errorCode,
                 error_message=error.errorMessage,
                 created_at=created_at)
-
-            data = await redis().get(error.pinfl)
-            data = json.loads(data)
-            data["message_ids"] = data.get("message_ids", [])
-            data["message_ids"].append(message.get("result").get("message_id"))
+            data[error_code_key]["message_ids"] = data[error_code_key].get("message_ids", [])
+            data[error_code_key]["message_ids"].append(message.get("result").get("message_id"))
+            data[error_code_key]["last_message_text"] = message.get("result").get("text")
+            data[error_code_key]["last_message_id"] = message.get("result").get("message_id")
             data = json.dumps(data, ensure_ascii=False, indent=4)
             try:
-                await redis().setex(name=error.pinfl, time=604800, value=data)
+                await redis().set(name=error.pinfl, value=data)
+            except Exception as e:
+                logger.error(f"error: {e}")
+            try:
+                # edit last message - remove keyboard
+                logger.info(f"last_message_id 2: {last_message_id} {error.tag}")
+                msg = await bot.edit_message_reply_markup(message_id=last_message_id, message_thread_id=error.tag)
+                logger.info(f"edit message: {msg}")
             except Exception as e:
                 logger.error(f"error: {e}")
 

@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import re
@@ -15,6 +16,7 @@ from app.schemas.error import AlertMessage, AlertMessageV2
 import os
 from functools import lru_cache
 from kombu import Queue
+from loguru import logger
 
 
 def route_task(name, args, kwargs, options, task=None, **kw):
@@ -158,25 +160,32 @@ class BotNotify:
         response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
         return response
 
-    async def send_alert_message_v2(self, error: AlertMessageV2, reply_to_message_id: int = None):
+    async def send_alert_message_v2(self, error: AlertMessageV2, reply_to_message_id: int = None,
+                                    try_count: int = 0):
+        data_key = f"ask_confirm:{error.pinfl}_{error.errorCode}"
+        if len(data_key) > 64:
+            data_key = data_key[:64]
         markup = {
             "inline_keyboard": [
                 [
                     {
-                        "text": "Проблема решена ✅",
-                        "callback_data": "face_id_err:{pinfl}".format(pinfl=error.pinfl),
+                        "text": "✅ Проблема решена",
+                        "callback_data": data_key,
                     },
                 ]
             ]
         }
         text = f"<i>🚨 {error.criticalityLevel}</i>\n"
-        text += f"<b>💬{error.errorMessage}</b>\n"
-        if error.errorCode:
-            text += f"Код ошибки: {error.errorCode}\n"
+        text += f"<b>💬 {error.errorMessage}</b>\n"
+        created_date = datetime.datetime.now().strftime("%H:%M:%S %Y-%m-%d")
+        text += f"🔍 Код ошибки: {error.errorCode}\n"
         if error.system:
-            text += f"Система: <b>{error.system}</b>\n"
+            text += f"📍 Система: <b>{error.system}</b>\n"
         if error.pinfl:
-            text += f"🆔ПИНФЛ: {error.pinfl}\n"
+            text += f"🆔 ПИНФЛ: <pre>{error.pinfl}</pre>\n"
+        text += f"🕓 {created_date}\n"
+        if try_count and try_count > 1:
+            text += f"🔁 Попытка №{try_count}\n"
 
         text = textwrap.dedent(text)
         data = {
@@ -184,11 +193,58 @@ class BotNotify:
             "text": text,
             "message_thread_id": error.tag,
             "parse_mode": "HTML",
-            # "reply_markup": markup,
+            "reply_markup": markup,
         }
         if reply_to_message_id:
             data["reply_to_message_id"] = reply_to_message_id
         url = self.alert_url + "sendMessage"
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
+        if reply_to_message_id and response.get("ok") is False:
+            # retry without reply_to_message_id
+            data.pop("reply_to_message_id")
+            response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
+        return response
+
+    async def send_confirm_message(self, text: str, message_id: int, message_thread_id: int,
+                                   parse_mode: str = 'Markdown',
+                                   confirm: bool = True, callback_data: str = None):
+        if confirm:
+            markup = {
+                "inline_keyboard": [
+                    [
+                        {
+                            "text": "✅ Подтвердить",
+                            "callback_data": f"f_id_er:{callback_data}",
+                        },
+                        {
+                            "text": "❌ Отменить",
+                            "callback_data": f"cancel:{callback_data}"
+                        }
+                    ]
+                ]
+            }
+        else:
+            markup = {
+                "inline_keyboard": [
+                    [
+                        {
+                            "text": "✅ Проблема решена",
+                            "callback_data": callback_data,
+                        },
+                    ]
+                ]
+            }
+        # markup = json.dumps(markup)
+        data = {
+            "chat_id": self.alert_group,
+            "text": text,
+            "parse_mode": parse_mode,
+            "reply_markup": markup,
+            "message_id": message_id,
+            "message_thread_id": message_thread_id,
+        }
+        url = self.alert_url + "editMessageText"
+        logger.info(f"send_confirm_message: {data}")
         response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
         return response
 
@@ -228,6 +284,62 @@ class BotNotify:
         url = self.url + "getWebhookInfo"
         response = requests.get(url, proxies=settings.proxy)
         return response.json()
+
+    async def edit_message_text(self, message_id: int, text: str, parse_mode: str = 'HTML',
+                                message_thread_id: int = None):
+        # add text "resolved" to message and remove inline keyboard
+        url = self.alert_url + "editMessageText"
+        data = {
+            "chat_id": self.alert_group,
+            "message_id": message_id,
+            "text": text,
+            "parse_mode": parse_mode,
+            "reply_markup": {"inline_keyboard": []},
+        }
+        if message_thread_id:
+            data["message_thread_id"] = message_thread_id
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
+        return response
+
+    async def edit_message_reply_markup(self, message_id: int, message_thread_id: int = None):
+        # remove inline keyboard
+        url = self.alert_url + "editMessageReplyMarkup"
+        data = {
+            "chat_id": self.alert_group,
+            "message_id": message_id,
+            "reply_markup": {"inline_keyboard": []},
+        }
+        if message_thread_id:
+            data["message_thread_id"] = message_thread_id
+        logger.info(f"edit_message_reply_markup: {data}")
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
+        return response
+
+    async def answer_callback_query(self, callback_query_id: str, text: str,
+                                    alert: bool = False, message_thread_id: int = None):
+        url = self.alert_url + "answerCallbackQuery"
+        data = {
+            "callback_query_id": callback_query_id,
+            "text": text,
+            "show_alert": alert,
+        }
+        if message_thread_id:
+            data["message_thread_id"] = message_thread_id
+        logger.info(f"answer_callback_query: {data}")
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
+        return response
+
+    async def delete_message(self, message_id: int, message_thread_id: int = None):
+        url = self.alert_url + "deleteMessage"
+        data = {
+            "chat_id": self.alert_group,
+            "message_id": message_id,
+        }
+        if message_thread_id:
+            data["message_thread_id"] = message_thread_id
+        logger.info(f"delete_message: {data}")
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
+        return response
 
 
 @dataclass
