@@ -120,6 +120,7 @@ class BotNotify:
         self.token = settings.BOT_TOKEN
         self.url = "https://api.telegram.org/bot{}/".format(self.token)
         self.alert_url = "https://api.telegram.org/bot{}/".format(settings.ALERT_BOT_TOKEN)
+        self.back_prod = "https://dbop.infinbank.com:9443/api/v2/"
         self.alert_channel = settings.ALERT_CHANNEL_ID
         self.alert_group = settings.NEW_ALERT_GROUP_ID
 
@@ -356,6 +357,16 @@ class BotNotify:
         logger.info(f"delete_message: {data}")
         response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
         return response
+
+
+    async def update_auth_limit(self, pinfl):
+        url = self.back_prod + "auth/limit/update"
+        data = {
+            "pinfl": pinfl
+        }
+        response = await post(url, {"Content-Type": "application/json"}, **data)
+        return response
+
 
 
 @dataclass

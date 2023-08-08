@@ -63,6 +63,8 @@ async def callback_query_handler(callback_query: dict, message_thread_id: int, k
                     if not item.get("ok"):
                         failed += 1
             # edit last message
+
+
             message_id = message_ids[-1]
             text = data[error_code_key].get("last_message_text")
             alert_text = ""
@@ -78,6 +80,14 @@ async def callback_query_handler(callback_query: dict, message_thread_id: int, k
                 alert_text += "Статус исправления ошибки в базе данных: исправлено"
                 msg = await bot.answer_callback_query(text=alert_text, callback_query_id=callback_query.get("id"),
                                                       alert=True)
+                resp = await bot.update_auth_limit(pinfl=pinfl)
+                if resp:
+                    if resp.get("data"):
+                        alert_text += f"Увеличен лимит попытки авторизации"
+                    elif resp.get("errorMessage"):
+                        alert_text += f"{resp.get('errorMessage')}"
+                else:
+                    alert_text += f"Не удалось увеличить лимит попытки авторизации"
                 logger.info(f"alert_text: {msg}")
             logger.info(f"edited message {message_id} {edited}")
             # data[error_code] delete from redis
