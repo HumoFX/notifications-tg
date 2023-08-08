@@ -364,7 +364,7 @@ class BotNotify:
         data = {
             "pinfl": pinfl
         }
-        response = await post(url, {"Content-Type": "application/json"}, **data)
+        response = await post(url, {"Content-Type": "application/json"}, proxy={}, **data)
         return response
 
 
