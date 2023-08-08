@@ -364,7 +364,11 @@ class BotNotify:
         data = {
             "pinfl": pinfl
         }
+        logger.info(f"update_auth_limit ==================")
+        logger.info(f"update_auth_url {url} {data}")
         response = await post(url, {"Content-Type": "application/json"}, proxy={}, **data)
+        logger.info(f"update_auth_limit {response}")
+        logger.info(f"update_auth_limit_end ==================")
         return response
 
 
