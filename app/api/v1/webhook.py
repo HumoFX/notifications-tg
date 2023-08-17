@@ -83,7 +83,6 @@ async def callback_query_handler(callback_query: dict, message_thread_id: int, k
                 logger.error(f"Error: {edited}")
                 alert_text += f"\n Не удалось отредактировать сообщение с ошибкой {error_code} для ПИНФЛ {pinfl}"
             resp = await bot.update_auth_limit(pinfl=pinfl)
-            logger.info(f"update_auth_limit: {resp}")
             if resp:
                 if resp.get("data"):
                     alert_text += f"Увеличен лимит попытки авторизации"
