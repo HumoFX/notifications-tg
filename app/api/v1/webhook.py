@@ -8,7 +8,7 @@ import datetime
 import pickle
 import json
 from app.models.users import User, UserCustomer
-from app.models.alert import FaceIDAlert
+from app.models.alert import FaceIDAlert, FaceIdAdmin
 from app.schemas.error import AlertMessage, AlertMessageV2
 from app.schemas.notification import Notification
 from app.schemas.reponse import ResponseBody
@@ -41,6 +41,12 @@ async def command_handler(message: str, message_thread_id: int):
         pass
 
 
+async def has_admin_perm(user_id: int) -> bool:
+    if user_id:
+        user = await FaceIdAdmin.where(User.user_id==user_id).gino.scalar()
+        return True if user else False
+
+
 async def callback_query_handler(callback_query: dict, message_thread_id: int, key: str, value: str):
     if key == "f_id_er":
         pinfl = value.split("_")[0]
@@ -64,13 +70,13 @@ async def callback_query_handler(callback_query: dict, message_thread_id: int, k
                         failed += 1
             # edit last message
 
-
             message_id = message_ids[-1]
             text = data[error_code_key].get("last_message_text")
             alert_text = ""
             if failed >= 1:
                 alert_text += f"Не удалось удалить {failed} сообщений с ошибкой {error_code} для ПИНФЛ {pinfl}"
-            text += f"\n\n✅ Исправлено"
+            user_id = callback_query["from"].get("id")
+            text += f"\n\n✅ Исправлено\n👨🏻‍💻#{user_id}"
             edited = await bot.edit_message_text(message_id=message_id, text=text,
                                                  message_thread_id=message_thread_id)
             if not edited.get("ok"):
@@ -146,6 +152,8 @@ async def telegram_webhook(request: Request):
     data = await request.json()
     logger.info(data)
     callback_query = data.get("callback_query")
+    from_user = callback_query.get("from")
+    user_id = from_user.get("id")
     message = data.get("message")
     is_command = message and message.get("text") and message.get("text").startswith("/")
     if message and is_command:
@@ -159,5 +167,10 @@ async def telegram_webhook(request: Request):
         key = data.split(":")[0]
         value = data.split(":")[1]
         logger.info(f"key: {key}, value: {value}, message_thread_id: {message_thread_id}")
-        await callback_query_handler(callback_query, message_thread_id, key, value)
+        has_perm = await has_admin_perm(user_id=user_id)
+        if not has_perm:
+            text = "У вас нет доступа"
+            await bot.answer_callback_query(text=text, message_thread_id=message_thread_id, alert=True)
+        else:
+            await callback_query_handler(callback_query, message_thread_id, key, value)
     return {"status": "ok"}
