@@ -173,7 +173,7 @@ async def telegram_webhook(request: Request):
         key = data.split(":")[0]
         value = data.split(":")[1]
         logger.info(f"key: {key}, value: {value}, message_thread_id: {message_thread_id}")
-        has_perm = await has_admin_perm(user_id=user_id)
+        has_perm = await has_admin_perm(user_id=user_id, permission_tag=message_thread_id)
         if not has_perm:
             text = "У вас нет доступа"
             await bot.answer_callback_query(text=text, message_thread_id=message_thread_id, alert=True)
