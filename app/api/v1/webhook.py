@@ -47,7 +47,7 @@ async def has_admin_perm(user_id: int, permission_tag) -> bool:
     has_access = False
     if user_id:
         user = await FaceIdAdmin.get(user_id)
-        logger.info(f"access user data {user} {user.first_name}")
+        logger.info(f"access user data {user} {user}")
         if user:
             permissions = user.data.get("tags", [])
             has_access = True if permission_tag in permissions else False
