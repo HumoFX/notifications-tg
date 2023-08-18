@@ -149,7 +149,8 @@ async def callback_query_handler(callback_query: dict, message_thread_id: int, k
             if not send_conf_message.get("ok") and send_conf_message.get("error_code") == 400:
                 text = "Произошла ошибка: \n"
                 text += send_conf_message.get("description")
-                await bot.answer_callback_query(text=text, message_thread_id=message_thread_id, alert=True)
+                await bot.answer_callback_query(text=text, alert=True,
+                                                callback_query_id=callback_query.get("id"))
 
 
 @router.post("/")
@@ -176,7 +177,7 @@ async def telegram_webhook(request: Request):
         has_perm = await has_admin_perm(user_id=user_id, permission_tag=message_thread_id)
         if not has_perm:
             text = "У вас нет доступа"
-            await bot.answer_callback_query(text=text, message_thread_id=message_thread_id, alert=True)
+            await bot.answer_callback_query(text=text, alert=True, callback_query_id=callback_query.get("id"))
         else:
             await callback_query_handler(callback_query, message_thread_id, key, value)
     return {"status": "ok"}
