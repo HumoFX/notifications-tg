@@ -46,10 +46,10 @@ async def command_handler(message: str, message_thread_id: int):
 async def has_admin_perm(user_id: int, permission_tag) -> bool:
     has_access = False
     if user_id:
-        user = await db.select([FaceIdAdmin.user_id, FaceIdAdmin.data]).where(FaceIdAdmin.user_id == user_id).gino.scalar()
+        user, user_data = await db.select([FaceIdAdmin.user_id, FaceIdAdmin.data]).where(FaceIdAdmin.user_id == user_id).gino.scalar()
         logger.info(f"access user data {user}")
-        if user:
-            permissions = user.data.get("tags", [])
+        if user and user_data:
+            permissions = user_data.get("tags", [])
             has_access = True if permission_tag in permissions else False
         return has_access
 
