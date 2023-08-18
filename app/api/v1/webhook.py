@@ -162,8 +162,7 @@ async def telegram_webhook(request: Request):
     data = await request.json()
     logger.info(data)
     callback_query = data.get("callback_query")
-    from_user = callback_query.get("from")
-    user_id = from_user.get("id")
+
     message = data.get("message")
     is_command = message and message.get("text") and message.get("text").startswith("/")
     if message and is_command:
@@ -172,6 +171,8 @@ async def telegram_webhook(request: Request):
         logger.info(f"message_thread_id: {message_thread_id}, text: {text}")
         await command_handler(text, message_thread_id)
     if callback_query:
+        from_user = callback_query.get("from")
+        user_id = from_user.get("id")
         message_thread_id = data["callback_query"]["message"].get("message_thread_id")
         data = callback_query.get("data")
         key = data.split(":")[0]
