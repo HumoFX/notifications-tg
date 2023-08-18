@@ -126,7 +126,7 @@ async def error_handler_v2(error: AlertMessageV2):
             # create FaceIDAlert
             created_at = datetime.datetime.now()
 
-            await FaceIDAlert.create(
+            face_id = await FaceIDAlert.create(
                 message_id=message.get("result").get("message_id"),
                 type=error.system,
                 topic=error.tag,
@@ -138,6 +138,7 @@ async def error_handler_v2(error: AlertMessageV2):
             data[error_code_key]["message_ids"].append(message.get("result").get("message_id"))
             data[error_code_key]["last_message_text"] = message.get("result").get("text")
             data[error_code_key]["last_message_id"] = message.get("result").get("message_id")
+            data[error_code_key]["face_id_alert"] = face_id.id if face_id else None
             data = json.dumps(data, ensure_ascii=False, indent=4)
             try:
                 await redis().set(name=error.pinfl, value=data)

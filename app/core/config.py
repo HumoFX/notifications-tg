@@ -186,7 +186,7 @@ class BotNotify:
             "inline_keyboard": [
                 [
                     {
-                        "text": "✅ Проблема решена",
+                        "text": "✅ Решить проблему",
                         "callback_data": data_key,
                     },
                 ]

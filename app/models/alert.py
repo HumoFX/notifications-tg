@@ -16,7 +16,7 @@ class FaceIDAlert(db.Model):
     error_code = Column(Integer, nullable=True, default=None)
     error_message = Column(String(512), nullable=True, default=None)
     created_at = Column(TIMESTAMP, default=datetime.now, nullable=False)
-    face_id_admin = Column(BigInteger, ForeignKey("FaceIdAdmin.user_id"))
+    face_id_admin = Column(BigInteger, ForeignKey("FaceIdAdmin.user_id"), nullable=True)
 
     # async def create(self):
     #     db.session.add(self)
@@ -31,5 +31,6 @@ class FaceIdAdmin(db.Model):
     first_name = Column(String(64))
     last_name = Column(String(64))
     username = Column(String(32))
+    data = Column(JSON, nullable=True)
     active = Column(Boolean, nullable=False, default=True)
     created_at = Column(TIMESTAMP, default=datetime.now())

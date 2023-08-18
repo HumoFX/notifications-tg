@@ -41,10 +41,14 @@ async def command_handler(message: str, message_thread_id: int):
         pass
 
 
-async def has_admin_perm(user_id: int) -> bool:
+async def has_admin_perm(user_id: int, permission_tag) -> bool:
+    has_access = False
     if user_id:
-        user = await FaceIdAdmin.where(User.user_id==user_id).gino.scalar()
-        return True if user else False
+        user = await FaceIdAdmin.query.where(User.user_id == user_id).gino.scalar()
+        if user:
+            permissions = user.data.get("tags", [])
+            has_access = True if permission_tag in permissions else False
+        return has_access
 
 
 async def callback_query_handler(callback_query: dict, message_thread_id: int, key: str, value: str):
@@ -79,6 +83,9 @@ async def callback_query_handler(callback_query: dict, message_thread_id: int, k
             text += f"\n\n✅ Исправлено\n👨🏻‍💻#{user_id}"
             edited = await bot.edit_message_text(message_id=message_id, text=text,
                                                  message_thread_id=message_thread_id)
+            face_id_alert = data[error_code_key]["face_id_alert"]
+            if face_id_alert:
+                await FaceIDAlert.update.values(face_id_admin=user_id).where(FaceIDAlert.id==face_id_alert).gino.status()
             if not edited.get("ok"):
                 logger.error(f"Error: {edited}")
                 alert_text += f"\n Не удалось отредактировать сообщение с ошибкой {error_code} для ПИНФЛ {pinfl}"
