@@ -7,6 +7,8 @@ from fastapi import APIRouter, Request
 import datetime
 import pickle
 import json
+
+from app.core.database import db
 from app.models.users import User, UserCustomer
 from app.models.alert import FaceIDAlert, FaceIdAdmin
 from app.schemas.error import AlertMessage, AlertMessageV2
@@ -44,7 +46,7 @@ async def command_handler(message: str, message_thread_id: int):
 async def has_admin_perm(user_id: int, permission_tag) -> bool:
     has_access = False
     if user_id:
-        user = await FaceIdAdmin.query.where(FaceIdAdmin.user_id == user_id).gino.scalar()
+        user = await db.select([FaceIdAdmin.id, FaceIdAdmin.data]).query.where(FaceIdAdmin.user_id == user_id).gino.scalar()
         logger.info(f"access user data {user}")
         if user:
             permissions = user.data.get("tags", [])
