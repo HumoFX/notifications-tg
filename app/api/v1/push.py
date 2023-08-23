@@ -24,13 +24,13 @@ router = APIRouter(prefix="/notification", tags=["notification"])
 bot = BotNotify()
 
 
-async def identify_topic_id(service_name, tag=None):
+async def identify_topic_id(service_name: str, tag=None):
     topics = await Topic.query.gino.all()
     topic_id = None
     for topic in topics:
         if ((tag and (topic.name == tag.lower() or
-                      tag.lower in topic.data.get("keys"))) or
-                service_name in topic.data.get("keys")):
+                      tag.lower() in topic.data.get("keys"))) or
+                service_name.lower() in topic.data.get("keys")):
             topic_id = topic.topic_id
             break
     return topic_id
