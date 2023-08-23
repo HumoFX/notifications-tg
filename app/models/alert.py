@@ -6,6 +6,13 @@ from app.core.database import db
 from datetime import datetime
 
 
+class Topic(db.Model):
+    __tablename__ = 'alert_topics'
+    name = Column(String(64), nullable=False)
+    topic_id = Column(Integer, nullable=False)
+    data = Column(JSON, nullable=True)
+
+
 class FaceIDAlert(db.Model):
     __tablename__ = 'face_id_alert'
     id = Column(Integer, primary_key=True, autoincrement=True)

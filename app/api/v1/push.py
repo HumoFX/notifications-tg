@@ -12,7 +12,7 @@ from app.models.alert import FaceIDAlert
 from app.schemas.error import AlertMessage, AlertMessageV2
 from app.schemas.notification import Notification
 from app.schemas.reponse import ResponseBody
-from app.core.config import BotNotify, settings, BotNotifyV2
+from app.core.config import BotNotify, settings, BotNotifyV2, identify_topic_id
 from app.utils.notification_service import get_all_subscribers, get_status, \
     customer_find_from_subscribers, send_batch_notification_to_topic_task_v2, send_batch_notification_to_topic_task, \
     send_batch_notification_to_topic_task_v3
@@ -59,7 +59,8 @@ async def test_notification(token: str, chat_id: str, text: str):
 
 @router.post('/errors', response_model=ResponseBody, status_code=200)
 async def error_handler(error: AlertMessage):
-    message = await bot.send_alert_message(error)
+    topic_id = await identify_topic_id(service_name=error.section, tag=error.tag)
+    message = await bot.send_alert_message_v3(error, topic_id)
     if message:
         if message.get('ok'):
             return ResponseBody(status=0, data={"message": "success"})

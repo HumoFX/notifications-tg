@@ -12,9 +12,10 @@ import asyncio
 import aiohttp
 from pydantic import BaseSettings, EmailStr, SecretStr, validator
 
+from app.core.database import db
+from app.models.alert import Topic
+
 from app.schemas.error import AlertMessage, AlertMessageV2
-import os
-from functools import lru_cache
 from kombu import Queue
 from loguru import logger
 
@@ -113,6 +114,18 @@ async def post(url, headers, proxy, **kwargs):
         except Exception as err:
             pass
             # logger.exception(f"Error in post {err}")
+
+
+async def identify_topic_id(service_name, tag=None):
+    topics = await Topic.query.gino.all()
+    topic_id = None
+    for topic in topics:
+        if ((tag and (topic.name == tag.lower() or
+                      tag.lower in topic.data.get("keys"))) or
+                service_name in topic.data.get("keys")):
+            topic_id = topic.topic_id
+            break
+    return topic_id
 
 
 class BotNotify:
@@ -220,6 +233,33 @@ class BotNotify:
             # retry without reply_to_message_id
             data.pop("reply_to_message_id")
             response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
+        return response
+
+    async def send_alert_message_v3(self, error: AlertMessage, topic_id=None):
+        created_date = datetime.datetime.now().strftime("%H:%M:%S %Y-%m-%d")
+        text = f"<i>🚨 {error.criticalityLevel}</i>\n"
+        text += f"<b>💬 {error.errorName}</b>\n"
+        text += f"🔍 Код ошибки: {error.errorCode}\n"
+        if error.section:
+            text += f"📍 Система: <b>{error.section}</b>\n"
+        if error.operation:
+            text += f"⚙️ Операция: {error.operation}\n"
+        if error.operationCodeIFB:
+            text += f"🏦️ Код операции IFB: <pre>{error.operationCodeIFB}</pre>\n"
+        if error.operationCodeABS:
+            text += f"🏦 Код операции АБС: <pre>{error.operationCodeABS}</pre>\n"
+        text += f"🕓 {created_date}\n"
+
+        text = textwrap.dedent(text)
+        data = {
+            "chat_id": self.alert_group,
+            "text": text,
+            "parse_mode": "HTML",
+        }
+        if topic_id:
+            data["message_thread_id"] = topic_id
+        url = self.alert_url + "sendMessage"
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
         return response
 
     async def send_confirm_message(self, text: str, message_id: int, message_thread_id: int,
@@ -358,7 +398,6 @@ class BotNotify:
         response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
         return response
 
-
     async def update_auth_limit(self, pinfl):
         url = self.back_prod + "auth/limit/update"
         data = {
@@ -370,7 +409,6 @@ class BotNotify:
         logger.info(f"update_auth_limit {response}")
         logger.info(f"update_auth_limit_end ==================")
         return response
-
 
 
 @dataclass
