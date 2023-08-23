@@ -1,5 +1,4 @@
 import datetime
-import json
 import os
 import re
 import textwrap
@@ -11,9 +10,6 @@ from fastapi.responses import JSONResponse, ujson
 import asyncio
 import aiohttp
 from pydantic import BaseSettings, EmailStr, SecretStr, validator
-
-from app.models.alert import Topic
-
 from app.schemas.error import AlertMessage, AlertMessageV2
 from kombu import Queue
 from loguru import logger
@@ -113,19 +109,6 @@ async def post(url, headers, proxy, **kwargs):
         except Exception as err:
             pass
             # logger.exception(f"Error in post {err}")
-
-
-async def identify_topic_id(service_name, tag=None):
-    topics = await Topic.query.gino.all()
-    topic_id = None
-    for topic in topics:
-        if ((tag and (topic.name == tag.lower() or
-                      tag.lower in topic.data.get("keys"))) or
-                service_name in topic.data.get("keys")):
-            topic_id = topic.topic_id
-            break
-    return topic_id
-
 
 class BotNotify:
     def __init__(self):

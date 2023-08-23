@@ -8,11 +8,11 @@ import datetime
 import pickle
 import json
 from app.models.users import User, UserCustomer
-from app.models.alert import FaceIDAlert
+from app.models.alert import FaceIDAlert, Topic
 from app.schemas.error import AlertMessage, AlertMessageV2
 from app.schemas.notification import Notification
 from app.schemas.reponse import ResponseBody
-from app.core.config import BotNotify, settings, BotNotifyV2, identify_topic_id
+from app.core.config import BotNotify, settings, BotNotifyV2
 from app.utils.notification_service import get_all_subscribers, get_status, \
     customer_find_from_subscribers, send_batch_notification_to_topic_task_v2, send_batch_notification_to_topic_task, \
     send_batch_notification_to_topic_task_v3
@@ -22,6 +22,18 @@ from loguru import logger
 
 router = APIRouter(prefix="/notification", tags=["notification"])
 bot = BotNotify()
+
+
+async def identify_topic_id(service_name, tag=None):
+    topics = await Topic.query.gino.all()
+    topic_id = None
+    for topic in topics:
+        if ((tag and (topic.name == tag.lower() or
+                      tag.lower in topic.data.get("keys"))) or
+                service_name in topic.data.get("keys")):
+            topic_id = topic.topic_id
+            break
+    return topic_id
 
 
 @router.post("/", response_model=ResponseBody, status_code=201)
@@ -121,7 +133,8 @@ async def error_handler_v2(error: AlertMessageV2):
         #     logger.error(f"error: {e}")
     # return ResponseBody(status=0, data={"message": "success"})
     logger.info(f"last_message_id: {last_message_id}")
-    message = await bot.send_alert_message_v2(error, reply_to_message_id=last_message_id, try_count=data[error_code_key].get('try_count'))
+    message = await bot.send_alert_message_v2(error, reply_to_message_id=last_message_id,
+                                              try_count=data[error_code_key].get('try_count'))
     if message:
         if message.get('ok'):
             # create FaceIDAlert
