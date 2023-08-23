@@ -12,7 +12,6 @@ import asyncio
 import aiohttp
 from pydantic import BaseSettings, EmailStr, SecretStr, validator
 
-from app.core.database import db
 from app.models.alert import Topic
 
 from app.schemas.error import AlertMessage, AlertMessageV2
