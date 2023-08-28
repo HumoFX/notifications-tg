@@ -83,7 +83,11 @@ async def callback_query_handler(callback_query: dict, message_thread_id: int, k
             if failed >= 1:
                 alert_text += f"Не удалось удалить {failed} сообщений с ошибкой {error_code} для ПИНФЛ {pinfl}"
             user_id = callback_query["from"].get("id")
-            text += f"\n\n✅ Исправлено\n👨🏻‍💻#{user_id}"
+            user = await FaceIdAdmin.get(user_id)
+            if user:
+                text += f"\n\n✅ Исправлено\n👨🏻‍💻{user.first_name} {user.last_name}"
+            else:
+                text += f"\n\n✅ Исправлено\n👨🏻‍💻#{user_id}"
             edited = await bot.edit_message_text(message_id=message_id, text=text,
                                                  message_thread_id=message_thread_id)
             face_id_alert = data[error_code_key]["face_id_alert"]
