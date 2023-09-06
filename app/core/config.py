@@ -134,6 +134,22 @@ class BotNotify:
         response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy)
         return response
 
+    async def send_message_v3(self, text: str, message_thread_id: int, alert: bool = False, parse_mode: str = 'HTML',
+                              reply_markup: dict = None, chat_id: int = None):
+        if not chat_id:
+            chat_id = self.alert_group
+        url = self.url + "sendMessage?chat_id={}&text={}&parse_mode={}".format(chat_id, text, parse_mode)
+        if alert:
+            url += "&showAlert=true"
+        if message_thread_id:
+            url += "&message_thread_id={}".format(message_thread_id)
+        if reply_markup:
+            url += "&reply_markup={}".format(ujson.dumps(reply_markup))
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy)
+        return response
+
+
+
     def sync_send_message(self, chat_id: str, text: str, parse_mode: str = 'Markdown'):
         headers = requests.utils.default_headers()
         headers.update(

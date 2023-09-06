@@ -3,10 +3,13 @@ import os
 import textwrap
 
 import requests
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from fastapi import APIRouter, Request
 import datetime
 import pickle
 import json
+
+from sqlalchemy import and_
 
 from app.core.database import db
 from app.models.users import User, UserCustomer
@@ -35,12 +38,21 @@ async def get_webhook_info():
 # async def report_to_xls():
 #     from xlsxwriter import Workbook
 #     pass
+async def report_handler(message_thread_id: int, chat_id: int = None):
+    text = "Выберите период"
+    keyboard = report_inline_buttons()
+    dict_keyboard = keyboard.to_python()
+    start_date = datetime.datetime.now() - datetime.timedelta(days=3)
+    end_date = datetime.datetime.now()
+    await export_alert_data_for_period_xls(start_date, end_date)
+    await bot.send_message_v3(text=text, chat_id=chat_id, message_thread_id=message_thread_id,
+                              reply_markup=dict_keyboard)
 
 
-async def command_handler(message: str, message_thread_id: int):
+async def command_handler(message: str, message_thread_id: int, chat_id: int = None):
     command = message.split(" ")[0]
     if command == "/report":
-        pass
+        await report_handler(message_thread_id, chat_id=chat_id)
 
 
 async def has_admin_perm(user_id: int, permission_tag) -> bool:
@@ -92,7 +104,8 @@ async def callback_query_handler(callback_query: dict, message_thread_id: int, k
                                                  message_thread_id=message_thread_id)
             face_id_alert = data[error_code_key]["face_id_alert"]
             if face_id_alert:
-                await FaceIDAlert.update.values(face_id_admin=user_id).where(FaceIDAlert.id==face_id_alert).gino.status()
+                await FaceIDAlert.update.values(face_id_admin=user_id).where(
+                    FaceIDAlert.id == face_id_alert).gino.status()
             if not edited.get("ok"):
                 logger.error(f"Error: {edited}")
                 alert_text += f"\n Не удалось отредактировать сообщение с ошибкой {error_code} для ПИНФЛ {pinfl}"
@@ -171,9 +184,10 @@ async def telegram_webhook(request: Request):
     is_command = message and message.get("text") and message.get("text").startswith("/")
     if message and is_command:
         message_thread_id = message.get("message_thread_id")
+        chat_id = message.get("chat").get("id")
         text = message.get("text")
         logger.info(f"message_thread_id: {message_thread_id}, text: {text}")
-        await command_handler(text, message_thread_id)
+        await command_handler(text, message_thread_id, chat_id=chat_id)
     if callback_query:
         from_user = callback_query.get("from")
         user_id = from_user.get("id")
@@ -189,3 +203,86 @@ async def telegram_webhook(request: Request):
         else:
             await callback_query_handler(callback_query, message_thread_id, key, value)
     return {"status": "ok"}
+
+
+def get_days_in_month(year, month):
+    import calendar
+    return calendar.monthrange(year, month)[1]
+
+
+def inline_calendar():
+    import datetime
+    now = datetime.datetime.now()
+    current_year = now.year
+    current_month = now.month
+    current_day = now.day
+    days = get_days_in_month(current_year, current_month)
+    keyboard = InlineKeyboardMarkup(row_width=7)
+    for day in range(1, days + 1):
+        keyboard.add(InlineKeyboardButton(text=str(day), callback_data=f"DAY-{day}"))
+    keyboard.row(InlineKeyboardButton(text="Предыдущий месяц", callback_data="PREV-MONTH"),
+                 InlineKeyboardButton(text="Следующий месяц", callback_data="NEXT-MONTH"))
+    return keyboard
+
+
+def get_calendar():
+    now = datetime.datetime.now()
+    current_year = now.year
+    current_month = now.month
+    current_day = now.day
+    days = get_days_in_month(current_year, current_month)
+    keyboard = InlineKeyboardMarkup(row_width=7)
+    keyboard.add(InlineKeyboardButton(text="Предыдущий месяц", callback_data="PREV-MONTH"),
+                 InlineKeyboardButton(text="Следующий месяц", callback_data="NEXT-MONTH"))
+    keyboard.add(InlineKeyboardButton(text="Пн", callback_data="MON"),
+                 InlineKeyboardButton(text="Вт", callback_data="TUE"),
+                 InlineKeyboardButton(text="Ср", callback_data="WED"),
+                 InlineKeyboardButton(text="Чт", callback_data="THU"),
+                 InlineKeyboardButton(text="Пт", callback_data="FRI"),
+                 InlineKeyboardButton(text="Сб", callback_data="SAT"),
+                 InlineKeyboardButton(text="Вс", callback_data="SUN"))
+    for day in range(1, days + 1):
+        keyboard.add(InlineKeyboardButton(text=str(day), callback_data=f"DAY-{day}"))
+    return keyboard
+
+
+def report_inline_buttons():
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard.add(InlineKeyboardButton(text="Час", callback_data="HOURLY"),
+                 InlineKeyboardButton(text="День", callback_data="DAILY"),
+                 InlineKeyboardButton(text="Неделя", callback_data="WEEKLY"),
+                 InlineKeyboardButton(text="Период", callback_data="PERIOD"))
+    return keyboard
+
+
+async def get_alert_data_for_period(start_date: datetime.datetime, end_date: datetime.datetime) -> list[FaceIDAlert]:
+    # face_id_alerts_with_face_id_admin = await FaceIDAlert.query.where(and_(FaceIDAlert.created_at >= start_date,
+    # FaceIDAlert.created_at <= end_date,)).leftJoin( FaceIdAdmin).select().gino.all() face_id_alert_grouped_by_pinfl
+    # = await FaceIDAlert.query.where(and_(FaceIDAlert.created_at >= start_date, FaceIDAlert.created_at <= end_date,
+    # )).group_by( FaceIDAlert.pinfl).select().gino.all()
+    face_id_alert_group_by_message = await FaceIDAlert.query.where(and_(FaceIDAlert.created_at >= start_date,
+                                                                        FaceIDAlert.created_at <= end_date, )).group_by(
+        FaceIDAlert.error_message).select().gino.all()
+    return face_id_alert_group_by_message
+
+
+async def export_alert_data_for_period_xls(start_date: datetime.datetime, end_date: datetime.datetime):
+    face_id_alerts_with_face_id_admin: list[FaceIDAlert] = await get_alert_data_for_period(start_date, end_date)
+    logger.info(face_id_alerts_with_face_id_admin)
+    import xlsxwriter
+    # workbook = xlsxwriter.Workbook('face_id_alerts.xlsx')
+    # worksheet = workbook.add_worksheet()
+    # worksheet.write(0, 0, "ПИНФЛ")
+    # worksheet.write(0, 1, "Имя")
+    # worksheet.write(0, 2, "Фамилия")
+    # worksheet.write(0, 3, "Отчество")
+    # worksheet.write(0, 4, "Дата")
+    # worksheet.write(0, 5, "Время")
+    # worksheet.write(0, 6, "Код ошибки")
+    # worksheet.write(0, 7, "Описание ошибки")
+    # worksheet.write(0, 8, "Исправлено")
+    # worksheet.write(0, 9, "Админ")
+    # for alert in face_id_alerts_with_face_id_admin:
+    #     error_code = alert.error_code
+    #     error_type = alert.type
+    #     error_message = alert.error_message

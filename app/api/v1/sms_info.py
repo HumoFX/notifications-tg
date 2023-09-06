@@ -43,5 +43,3 @@ async def send(sms: SMS):
         return ResponseBody(status=1000, errorMessage="Failed to send message")
     else:
         return ResponseBody(status=1001, errorMessage="Failed to send message")
-
-
