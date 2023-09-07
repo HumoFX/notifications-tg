@@ -408,6 +408,15 @@ class BotNotify:
         logger.info(f"update_auth_limit_end ==================")
         return response
 
+    async def send_file(self, file, chat_id: int = None):
+        url = self.alert_url + "sendDocument"
+        data = {
+            "chat_id": chat_id,
+            "document": file,
+        }
+        response = await post(url, {"Content-Type": "application/json"}, proxy=settings.proxy, **data)
+        return response
+
 
 @dataclass
 class BotNotifyV2:

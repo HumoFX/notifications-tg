@@ -4,6 +4,7 @@ import textwrap
 
 import requests
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import KeyboardBuilder
 from fastapi import APIRouter, Request
 import datetime
 import pickle
@@ -44,7 +45,12 @@ async def report_handler(message_thread_id: int, chat_id: int = None):
     dict_keyboard = keyboard.to_python()
     start_date = datetime.datetime.now() - datetime.timedelta(days=3)
     end_date = datetime.datetime.now()
-    await export_alert_data_for_period_xls(start_date, end_date)
+    file_path = await export_alert_data_for_period_xls(start_date, end_date)
+    logger.info(f"file_path: {file_path}")
+    if file_path:
+        with open(file_path, "rb") as file:
+            resp = await bot.send_file(chat_id=chat_id, file=file)
+            logger.info(f"resp: {resp}")
     await bot.send_message_v3(text=text, chat_id=chat_id, message_thread_id=message_thread_id,
                               reply_markup=dict_keyboard)
 
@@ -102,10 +108,12 @@ async def callback_query_handler(callback_query: dict, message_thread_id: int, k
                 text += f"\n\n✅ Исправлено\n👨🏻‍💻#{user_id}"
             edited = await bot.edit_message_text(message_id=message_id, text=text,
                                                  message_thread_id=message_thread_id)
-            face_id_alert = data[error_code_key]["face_id_alert"]
+            face_id_alert = data[error_code_key].get("face_id_alert")
             if face_id_alert:
                 await FaceIDAlert.update.values(face_id_admin=user_id).where(
                     FaceIDAlert.id == face_id_alert).gino.status()
+            else:
+                logger.error(f"Error: face_id_alert not found {face_id_alert}")
             if not edited.get("ok"):
                 logger.error(f"Error: {edited}")
                 alert_text += f"\n Не удалось отредактировать сообщение с ошибкой {error_code} для ПИНФЛ {pinfl}"
@@ -246,8 +254,14 @@ def get_calendar():
     return keyboard
 
 
+def get_calendar_v2():
+    # Build keyboard
+    keyboard = KeyboardBuilder()
+    keyboard.add("Предыдущий месяц", "Следующий месяц")
+
+
 def report_inline_buttons():
-    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard = InlineKeyboardMarkup(row_width=2, inline_keyboard=[])
     keyboard.add(InlineKeyboardButton(text="Час", callback_data="HOURLY"),
                  InlineKeyboardButton(text="День", callback_data="DAILY"),
                  InlineKeyboardButton(text="Неделя", callback_data="WEEKLY"),
@@ -260,29 +274,40 @@ async def get_alert_data_for_period(start_date: datetime.datetime, end_date: dat
     # FaceIDAlert.created_at <= end_date,)).leftJoin( FaceIdAdmin).select().gino.all() face_id_alert_grouped_by_pinfl
     # = await FaceIDAlert.query.where(and_(FaceIDAlert.created_at >= start_date, FaceIDAlert.created_at <= end_date,
     # )).group_by( FaceIDAlert.pinfl).select().gino.all()
-    face_id_alert_group_by_message = await FaceIDAlert.query.where(and_(FaceIDAlert.created_at >= start_date,
-                                                                        FaceIDAlert.created_at <= end_date, )).group_by(
-        FaceIDAlert.error_message).select().gino.all()
-    return face_id_alert_group_by_message
+    face_id_alert_group_by_message_with_count = await db.select([FaceIDAlert.error_code, FaceIDAlert.type,
+                                                                 FaceIDAlert.error_message, db.func.count(
+            FaceIDAlert.error_message).label("count")]).where(and_(FaceIDAlert.created_at >= start_date,
+                                                                   FaceIDAlert.created_at <= end_date)).group_by(
+        FaceIDAlert.error_message).gino.all()
+
+    return face_id_alert_group_by_message_with_count
 
 
 async def export_alert_data_for_period_xls(start_date: datetime.datetime, end_date: datetime.datetime):
     face_id_alerts_with_face_id_admin: list[FaceIDAlert] = await get_alert_data_for_period(start_date, end_date)
     logger.info(face_id_alerts_with_face_id_admin)
     import xlsxwriter
-    # workbook = xlsxwriter.Workbook('face_id_alerts.xlsx')
-    # worksheet = workbook.add_worksheet()
-    # worksheet.write(0, 0, "ПИНФЛ")
-    # worksheet.write(0, 1, "Имя")
-    # worksheet.write(0, 2, "Фамилия")
-    # worksheet.write(0, 3, "Отчество")
-    # worksheet.write(0, 4, "Дата")
-    # worksheet.write(0, 5, "Время")
-    # worksheet.write(0, 6, "Код ошибки")
-    # worksheet.write(0, 7, "Описание ошибки")
-    # worksheet.write(0, 8, "Исправлено")
-    # worksheet.write(0, 9, "Админ")
-    # for alert in face_id_alerts_with_face_id_admin:
-    #     error_code = alert.error_code
-    #     error_type = alert.type
-    #     error_message = alert.error_message
+    import uuid
+    file_name = f"{uuid.uuid4().hex}.xlsx"
+    dir = os.path.join(os.getcwd(), "reports")
+    if not os.path.exists(dir):
+        os.mkdir(dir)
+    file_path = os.path.join(dir, file_name)
+    workbook = xlsxwriter.Workbook(file_path)
+    worksheet = workbook.add_worksheet()
+    worksheet.write(0, 0, "Код ошибки")
+    worksheet.write(0, 1, "Название операции")
+    worksheet.write(0, 2, "Описание")
+    worksheet.write(0, 3, "Количество")
+    for index, alert in enumerate(face_id_alerts_with_face_id_admin):
+        error_code = alert.error_code
+        error_type = alert.type
+        error_message = alert.error_message
+        count = alert.count
+        worksheet.write(index + 1, 0, error_code)
+        worksheet.write(index + 1, 1, error_type)
+        worksheet.write(index + 1, 2, error_message)
+        worksheet.write(index + 1, 3, count)
+    workbook.close()
+    # send file to telegram chat id
+    return file_path
